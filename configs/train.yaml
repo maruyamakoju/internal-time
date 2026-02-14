@@ -1,0 +1,61 @@
+defaults:
+  - _self_
+
+seed: 42
+device: cpu
+
+train:
+  total_timesteps: 200000
+  num_envs: 8
+  rollout_steps: 256
+  gamma: 0.99
+  gae_lambda: 0.95
+  learning_rate: 0.0003
+  update_epochs: 8
+  mini_batch_size: 512
+  clip_coef: 0.2
+  clip_vloss: true
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  target_kl: 0.03
+  normalize_advantage: true
+  anneal_lr: true
+  discount_mode: fixed
+  max_discount_exponent: 10.0
+
+env:
+  id: CartPole-v1
+  reward_delay: 0
+  flicker_prob: 0.0
+  variable_speed: false
+  min_repeat: 1
+  max_repeat: 4
+
+model:
+  obs_embed_dim: 128
+  hidden_dim: 128
+  encoder_hidden_dim: 128
+  activation: tanh
+  init_log_std: -0.5
+  min_tau: 0.0001
+  time_head_hidden_dim: 128
+  transition_mode: learned
+  fixed_tau: 1.0
+  standard_tau_proxy: 10.0
+
+time_reg:
+  lambda_var: 0.01
+  lambda_mean: 0.001
+  lambda_energy: 0.0
+  kl_beta: 0.0
+  prior_log_mean: -0.5
+  prior_log_std: 0.75
+
+logging:
+  run_dir: runs/latest
+  print_every_updates: 2
+  obs_zero_threshold: 0.00000001
+  use_wandb: false
+  wandb_project: internal-time-rl
+  wandb_name: null

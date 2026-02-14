@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "internal-time-rl"
+version = "0.1.0"
+description = "Internal time adaptive temporal reparameterization for RL agents"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=1.26",
+  "torch>=2.1",
+  "gymnasium>=0.29",
+  "hydra-core>=1.3",
+  "omegaconf>=2.3",
+  "pandas>=2.1",
+  "matplotlib>=3.8",
+  "tqdm>=4.66",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["internal_time_rl*"]
+
