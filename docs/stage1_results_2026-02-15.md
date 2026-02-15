@@ -190,12 +190,42 @@ Result:
 
 - speed benefit of learned internal time does not transfer to Acrobot at this budget/config.
 
+### 4) Fairness closure: same-gamma controls for learned/const/fixed
+
+Purpose: close the last fairness gap by evaluating learned/const/fixed controls under the same `gamma=0.97`.
+
+Roots:
+
+- `runs/sweeps/controls/cartpole_speed_learned_gamma097`
+- `runs/sweeps/controls/const_tau_c1_gamma097`
+- `runs/sweeps/controls/fixed_tau10_internal_tau_gamma097`
+
+Final means:
+
+- learned (`gamma=0.97`):
+  - `learned_tau_speed_objdt`: 352.650
+  - `learned_tau_speed_subjdt`: 288.242
+- constant subjective discount (`gamma=0.97`, `c=1`):
+  - `standard_gru_speed`: 274.278
+- fixed tau with subjective discount (`gamma=0.97`):
+  - `fixed_tau_10_speed`: 252.442
+
+Result:
+
+- At `gamma=0.97`, learned `objdt` remains strong and stays above gamma-tuned `standard_gru_speed` (`352.650` vs `333.649`).
+- Learned `subjdt` is gamma-sensitive (`353.998 @ gamma=0.99` to `288.242 @ gamma=0.97`).
+- Even at `gamma=0.97`, adaptive learned `subjdt` is above non-adaptive subjective controls (`288.242` vs `274.278` and `252.442`).
+
 ### Story lock after controls
 
-- Keep the main positive claim focused on CartPole speed and supported Pendulum speed:
-  - adaptive subjective time > standard baseline
-  - adaptive subjective time > constant subjective-discount controls
-- Do not claim universal superiority over all fixed controls, since gamma-tuned `fixed_tau_10_speed` can be stronger on CartPole speed.
+- Keep the main positive claim focused on variable-speed settings (CartPole, supported by Pendulum).
+- Separate two effects explicitly:
+  - adaptive internal-time dynamics (strong under `objdt`, including `gamma=0.97`)
+  - adaptive subjective discounting (`subjdt`), which helps at default gamma but is gamma-sensitive
+- Keep the non-adaptive control claim:
+  - learned `subjdt` > constant subjective discount controls
+  - learned `subjdt` > fixed tau + subjective discount control
+- Do not claim universal superiority over all fixed controls, since gamma-tuned `fixed_tau_10_speed` (`env_dt`) can be stronger on CartPole speed.
 - Treat Acrobot speed as a negative/generalization-limit result.
 
 ### Figure bundle (fixed names)
@@ -209,8 +239,11 @@ Copied into `docs/figures`:
 - `docs/figures/fig_cartpole_speed_gamma0995_final.png`
 - `docs/figures/fig_cartpole_speed_gamma0999_final.png`
 - `docs/figures/fig_cartpole_speed_const_tau_c1_final.png`
+- `docs/figures/fig_cartpole_speed_const_tau_c1_gamma097_final.png`
 - `docs/figures/fig_cartpole_speed_const_tau_c2_final.png`
 - `docs/figures/fig_cartpole_speed_const_tau_c3_final.png`
+- `docs/figures/fig_cartpole_speed_fixed_tau10_internal_tau_gamma097_final.png`
+- `docs/figures/fig_cartpole_speed_learned_gamma097_final.png`
 - `docs/figures/fig_pendulum_speed_final.png`
 - `docs/figures/fig_acrobot_speed_final.png`
 
