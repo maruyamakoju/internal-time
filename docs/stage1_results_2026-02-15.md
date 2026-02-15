@@ -109,3 +109,111 @@ Interpretation:
 - For the next paper plot set, prioritize:
   - CartPole `stage1_full` (main figure set)
   - Pendulum variable-speed subset (cross-environment support for temporal reparameterization claim)
+
+## Defense controls (added 2026-02-15)
+
+### 1) Gamma-tuning control on CartPole speed
+
+Purpose: test whether speed gains are only from selecting a better fixed `gamma`.
+
+Roots:
+
+- `runs/sweeps/controls/cartpole_speed_gamma097`
+- `runs/sweeps/controls/cartpole_speed_gamma099`
+- `runs/sweeps/controls/cartpole_speed_gamma0995`
+- `runs/sweeps/controls/cartpole_speed_gamma0999`
+
+Final means (`episode/return_mean_20`, 5 seeds):
+
+- gamma 0.97:
+  - `standard_gru_speed`: 333.649
+  - `fixed_tau_10_speed`: 369.006
+- gamma 0.99:
+  - `standard_gru_speed`: 318.210
+  - `fixed_tau_10_speed`: 288.718
+- gamma 0.995:
+  - `standard_gru_speed`: 297.135
+  - `fixed_tau_10_speed`: 277.740
+- gamma 0.999:
+  - `standard_gru_speed`: 272.545
+  - `fixed_tau_10_speed`: 303.819
+
+Reference from main run (`runs/sweeps/stage1_full_lm0_lv1e-2`):
+
+- `learned_tau_speed_subjdt`: 353.998
+
+Result:
+
+- `learned_tau_speed_subjdt` beats best gamma-tuned `standard_gru_speed` (353.998 vs 333.649).
+- best gamma-tuned `fixed_tau_10_speed` remains stronger (369.006).
+
+### 2) Constant subjective-discount control (non-adaptive)
+
+Purpose: test whether adaptivity is necessary vs fixed subjective discount.
+
+Roots:
+
+- `runs/sweeps/controls/const_tau_c1`
+- `runs/sweeps/controls/const_tau_c2`
+- `runs/sweeps/controls/const_tau_c3`
+
+Setup: `standard_gru_speed` with `train.discount_mode=internal_tau` and fixed `model.standard_tau_proxy=c`.
+
+Final means:
+
+- `c=1`: 315.075
+- `c=2`: 309.552
+- `c=3`: 288.438
+
+Reference:
+
+- `learned_tau_speed_subjdt`: 353.998
+
+Result:
+
+- adaptive subjective time beats all tested constant subjective-discount controls.
+
+### 3) Cross-env speed extension (Acrobot)
+
+Root:
+
+- `runs/sweeps/acrobot_speed_stage1_lm0_lv1e-2`
+
+Final means:
+
+- `standard_gru_speed`: -125.209
+- `fixed_tau_10_speed`: -134.833
+- `learned_tau_speed_objdt`: -185.355
+- `learned_tau_speed_subjdt`: -199.451
+
+Result:
+
+- speed benefit of learned internal time does not transfer to Acrobot at this budget/config.
+
+### Story lock after controls
+
+- Keep the main positive claim focused on CartPole speed and supported Pendulum speed:
+  - adaptive subjective time > standard baseline
+  - adaptive subjective time > constant subjective-discount controls
+- Do not claim universal superiority over all fixed controls, since gamma-tuned `fixed_tau_10_speed` can be stronger on CartPole speed.
+- Treat Acrobot speed as a negative/generalization-limit result.
+
+### Figure bundle (fixed names)
+
+Copied into `docs/figures`:
+
+- `docs/figures/fig_cartpole_stage1_full_learning_curves.png`
+- `docs/figures/fig_cartpole_stage1_full_final.png`
+- `docs/figures/fig_cartpole_speed_gamma097_final.png`
+- `docs/figures/fig_cartpole_speed_gamma099_final.png`
+- `docs/figures/fig_cartpole_speed_gamma0995_final.png`
+- `docs/figures/fig_cartpole_speed_gamma0999_final.png`
+- `docs/figures/fig_cartpole_speed_const_tau_c1_final.png`
+- `docs/figures/fig_cartpole_speed_const_tau_c2_final.png`
+- `docs/figures/fig_cartpole_speed_const_tau_c3_final.png`
+- `docs/figures/fig_pendulum_speed_final.png`
+- `docs/figures/fig_acrobot_speed_final.png`
+
+Machine-readable summary table:
+
+- `docs/stage1_controls_summary_2026-02-15.csv`
