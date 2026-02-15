@@ -1,0 +1,6 @@
+task,standard_gru_speed,fixed_tau_10_speed,learned_tau_speed_objdt,learned_tau_speed_subjdt,learned_tau_speed_objdt_gamma097,learned_tau_speed_subjdt_gamma097,best_standard_gamma,best_standard_gamma_value,best_fixed_tau10_gamma,best_fixed_tau10_value,best_const_tau_gamma099_c,best_const_tau_gamma099_value,fixed_tau10_internal_tau_gamma097,fixed_tau10_internal_tau_gamma099,delta_subjdt099_vs_best_standard,delta_subjdt099_vs_best_fixed_envdt,delta_subjdt099_vs_best_const_tau,delta_subjdt099_vs_fixed_internal_tau099
+cartpole_speed,318.21,288.718,300.463,353.998,352.65,288.242,0.97,333.649,0.97,369.006,1,315.075,252.442,346.465,20.349,-15.008,38.923,7.533
+pendulum_speed,-1194.068,-1115.918,-1139.003,-1120.663,,,,,,,,,,,,,,
+acrobot_speed,-125.209,-134.833,-185.355,-199.451,,,,,,,,,,,,,,
+cartpole_base,223.385,221.373,277.668,,,,,,,,,,,,,,,
+cartpole_flicker03,242.702,251.349,249.542,,,,,,,,,,,,,,,

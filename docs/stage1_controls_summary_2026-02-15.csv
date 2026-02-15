@@ -26,3 +26,4 @@ cartpole_learned_gamma,0.97,learned_tau_speed_objdt,352.650
 cartpole_learned_gamma,0.97,learned_tau_speed_subjdt,288.242
 cartpole_const_tau_gamma,gamma=0.97_c=1,standard_gru_speed,274.278
 cartpole_fixed_internal_tau_gamma,0.97,fixed_tau_10_speed,252.442
+cartpole_fixed_internal_tau_gamma,0.99,fixed_tau_10_speed,346.465

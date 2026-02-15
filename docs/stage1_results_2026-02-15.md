@@ -199,6 +199,7 @@ Roots:
 - `runs/sweeps/controls/cartpole_speed_learned_gamma097`
 - `runs/sweeps/controls/const_tau_c1_gamma097`
 - `runs/sweeps/controls/fixed_tau10_internal_tau_gamma097`
+- `runs/sweeps/controls/fixed_tau10_internal_tau_gamma099`
 
 Final means:
 
@@ -209,12 +210,15 @@ Final means:
   - `standard_gru_speed`: 274.278
 - fixed tau with subjective discount (`gamma=0.97`):
   - `fixed_tau_10_speed`: 252.442
+- fixed tau with subjective discount (`gamma=0.99`):
+  - `fixed_tau_10_speed`: 346.465
 
 Result:
 
 - At `gamma=0.97`, learned `objdt` remains strong and stays above gamma-tuned `standard_gru_speed` (`352.650` vs `333.649`).
 - Learned `subjdt` is gamma-sensitive (`353.998 @ gamma=0.99` to `288.242 @ gamma=0.97`).
 - Even at `gamma=0.97`, adaptive learned `subjdt` is above non-adaptive subjective controls (`288.242` vs `274.278` and `252.442`).
+- At matched `gamma=0.99`, `learned_tau_speed_subjdt` stays above fixed subjective-discount control (`353.998` vs `346.465`).
 
 ### Story lock after controls
 
@@ -243,6 +247,7 @@ Copied into `docs/figures`:
 - `docs/figures/fig_cartpole_speed_const_tau_c2_final.png`
 - `docs/figures/fig_cartpole_speed_const_tau_c3_final.png`
 - `docs/figures/fig_cartpole_speed_fixed_tau10_internal_tau_gamma097_final.png`
+- `docs/figures/fig_cartpole_speed_fixed_tau10_internal_tau_gamma099_final.png`
 - `docs/figures/fig_cartpole_speed_learned_gamma097_final.png`
 - `docs/figures/fig_pendulum_speed_final.png`
 - `docs/figures/fig_acrobot_speed_final.png`
@@ -250,3 +255,4 @@ Copied into `docs/figures`:
 Machine-readable summary table:
 
 - `docs/stage1_controls_summary_2026-02-15.csv`
+- `docs/stage1_key_table.csv`
