@@ -243,15 +243,18 @@ Machine-readable summary:
 
 - `docs/stage2_warmup_search_2026-02-16.csv`
 
-Best result (`both20k`, 10 seeds, root `runs/sweeps/stage2_delay_delaybiased_warmup_both20k_v1`):
+Best result by mean final score (`both20k`, 15 seeds, root `runs/sweeps/stage2_delay_delaybiased_warmup_both20k_v1`):
 
-- Paired final delta (`selfmodel - learned`): `+95.560` (CI `[22.421, 170.151]`)
-- Paired AUC delta (`selfmodel - learned`): `+24.306` (CI `[-3.725, 57.548]`)
+- Paired final delta (`selfmodel - learned`): `+46.610` (CI `[-16.417, 114.002]`)
+- Paired AUC delta (`selfmodel - learned`): `-4.707` (CI `[-35.320, 27.684]`)
+- Paired final delta (`selfmodel - noerr`): `+18.439` (CI `[-54.143, 90.941]`)
+- Paired AUC delta (`selfmodel - noerr`): `-8.962` (CI `[-39.972, 23.692]`)
 
 Interpretation:
 
-- Warmup converted delay=10 from inconclusive (`selfmodel - learned` CI crossing zero) to a positive final-performance gap with CI lower bound above zero.
-- AUC also improved in mean, but CI still crosses zero, so sample-efficiency superiority is not yet fixed.
+- The earlier 10-seed gain for `both20k` did not hold under seed expansion to 15 seeds.
+- Under warmup, both `selfmodel - learned` and `selfmodel - noerr` are direction-positive in final mean but not statistically conclusive at 95% CI.
+- AUC does not improve robustly under the current 15-seed estimate.
 - `tauonly50k` and `lambdaonly50k` both underperformed, indicating that balanced short warmup is the stable direction rather than one-sided long warmup.
 
 ## Figures
