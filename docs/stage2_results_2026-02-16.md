@@ -90,6 +90,42 @@ Interpretation:
 - With delay-biased time regularization and tuned `lambda_self`, Stage-2 improves over Stage-1 learned delay baseline.
 - Final performance improves but AUC is lower (`171.216` vs `198.547`), so sample efficiency remains a tuning target.
 
+## Ablation: pred_error -> tau OFF (One-Bit)
+
+To isolate causal contribution of the error-to-time pathway, we added:
+
+- `model.use_pred_error_for_tau=false`
+- Implementation detail for fairness:
+  - Keep the same time-head input dimensionality in self-model mode.
+  - Pass `zeros_like(pred_error)` as the extra feature when OFF.
+
+Run:
+
+- Added condition: `learned_tau_delay10_selfmodel_noerr`
+- Root: `runs/sweeps/stage2_delay_delaybiased_ls3e-1`
+- Overrides:
+  - `time_reg.lambda_mean=1e-3`
+  - `time_reg.lambda_var=1e-2`
+  - `train.lambda_self=0.3`
+
+From `runs/sweeps/stage2_delay_delaybiased_ls3e-1/aggregate/condition_summary.csv`:
+
+- `learned_tau_delay10`: final `232.915 +/- 99.640`, AUC `198.547 +/- 34.286`
+- `learned_tau_delay10_selfmodel`: final `294.247 +/- 105.984`, AUC `171.216 +/- 27.657`
+- `learned_tau_delay10_selfmodel_noerr`: final `184.063 +/- 57.756`, AUC `175.358 +/- 46.799`
+
+Signal columns:
+
+- `learned_tau_delay10_selfmodel`: `corr/tau_pred_error=0.591 +/- 0.109`
+- `learned_tau_delay10_selfmodel_noerr`: `corr/tau_pred_error=0.686 +/- 0.081`
+
+Interpretation:
+
+- Turning OFF the `pred_error -> tau` pathway removes the Stage-2 gain (`294.247 -> 184.063`).
+- With self-model training still enabled, performance drops below the learned Stage-1 delay baseline in this setting.
+- `corr/tau_pred_error` can stay non-zero as an observational correlation from shared latent dynamics; the intervention result above is the causal evidence.
+- This supports the causal claim that Stage-2 improvement in delay-biased setup comes from using prediction error to modulate internal time.
+
 ## Figures
 
 - `runs/sweeps/stage2_delay_lm0_lv1e-2/aggregate/learning_curves.png`
@@ -104,3 +140,5 @@ Interpretation:
 - `runs/sweeps/stage2_delay_delaybiased_ls3e-1/aggregate/final_performance.png`
 - `docs/figures/fig_stage2_delay_delaybiased_best_learning_curves.png`
 - `docs/figures/fig_stage2_delay_delaybiased_best_final.png`
+- `docs/figures/fig_stage2_delay_delaybiased_ablation_noerr_learning_curves.png`
+- `docs/figures/fig_stage2_delay_delaybiased_ablation_noerr_final.png`

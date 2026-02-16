@@ -264,6 +264,7 @@ def _build_policy_cfg(cfg: DictConfig) -> PolicyConfig:
         fixed_tau=float(cfg.model.fixed_tau),
         standard_tau_proxy=float(cfg.model.get("standard_tau_proxy", 10.0)),
         use_self_model=bool(cfg.model.get("use_self_model", False)),
+        use_pred_error_for_tau=bool(cfg.model.get("use_pred_error_for_tau", True)),
         self_model_hidden_dim=int(cfg.model.get("self_model_hidden_dim", cfg.model.hidden_dim)),
         time_reg=time_reg,
     )

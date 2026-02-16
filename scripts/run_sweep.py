@@ -190,6 +190,16 @@ CONDITION_SUITES: dict[str, dict[str, list[str]]] = {
             "env.variable_speed=false",
             "train.discount_mode=fixed",
         ],
+        "learned_tau_delay10_selfmodel_noerr": [
+            "model.transition_mode=learned",
+            "model.use_self_model=true",
+            "model.use_pred_error_for_tau=false",
+            "train.lambda_self=0.1",
+            "env.reward_delay=10",
+            "env.flicker_prob=0.0",
+            "env.variable_speed=false",
+            "train.discount_mode=fixed",
+        ],
     },
 }
 

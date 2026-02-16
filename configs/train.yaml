@@ -45,6 +45,7 @@ model:
   fixed_tau: 1.0
   standard_tau_proxy: 10.0
   use_self_model: false
+  use_pred_error_for_tau: true
   self_model_hidden_dim: 128
 
 time_reg:

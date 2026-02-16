@@ -25,6 +25,7 @@ class PolicyConfig:
     fixed_tau: float = 1.0
     standard_tau_proxy: float = 10.0
     use_self_model: bool = False
+    use_pred_error_for_tau: bool = True
     self_model_hidden_dim: int = 128
     time_reg: TimeRegConfig = field(default_factory=TimeRegConfig)
 
@@ -155,7 +156,13 @@ class InternalTimeActorCritic(nn.Module):
         else:
             if self.time_head is None:
                 raise RuntimeError("time_head is not initialized in learned mode.")
-            tau_extra = pred_error.detach().unsqueeze(-1) if self.use_self_model else None
+            tau_extra = None
+            if self.use_self_model:
+                if self.cfg.use_pred_error_for_tau:
+                    tau_extra = pred_error.detach().unsqueeze(-1)
+                else:
+                    # Keep input dimensionality/parameter count unchanged for fair ablation.
+                    tau_extra = torch.zeros_like(pred_error).unsqueeze(-1)
             delta_tau, raw_tau = self.time_head(h_prev, x, extra=tau_extra)
 
         alpha = InternalTimeHead.time_alpha(delta_tau).unsqueeze(-1)
