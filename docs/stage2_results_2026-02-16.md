@@ -76,19 +76,19 @@ Using `lambda_self=0.3`, we compared `learned` vs `selfmodel` under delay-biased
 
 From `runs/sweeps/stage2_delay_delaybiased_ls3e-1/aggregate/condition_summary.csv`:
 
-- `learned_tau_delay10`: `232.684 +/- 91.857`
-- `learned_tau_delay10_selfmodel`: `249.198 +/- 97.876`
+- `learned_tau_delay10`: `214.513 +/- 85.890`
+- `learned_tau_delay10_selfmodel`: `229.079 +/- 90.789`
 
 Stage-2 signal at best setting:
 
-- `corr/tau_pred_error_mean`: `0.641 +/- 0.120`
-- `pred_error/mean_mean`: `0.084 +/- 0.019`
-- `loss/self_model_mean`: `0.010 +/- 0.004`
+- `corr/tau_pred_error_mean`: `0.666 +/- 0.115`
+- `pred_error/mean_mean`: `0.086 +/- 0.021`
+- `loss/self_model_mean`: `0.011 +/- 0.005`
 
 Interpretation:
 
 - With delay-biased time regularization and tuned `lambda_self`, Stage-2 improves over Stage-1 learned delay baseline.
-- Final performance improves but AUC is lower (`164.620` vs `179.250`), so sample efficiency remains a tuning target.
+- Final performance improves but AUC is lower (`160.669` vs `179.016`), so sample efficiency remains a tuning target.
 
 ## Ablation: pred_error -> tau OFF (One-Bit)
 
@@ -110,18 +110,18 @@ Run:
 
 From `runs/sweeps/stage2_delay_delaybiased_ls3e-1/aggregate/condition_summary.csv`:
 
-- `learned_tau_delay10`: final `232.684 +/- 91.857`, AUC `179.250 +/- 33.388`
-- `learned_tau_delay10_selfmodel`: final `249.198 +/- 97.876`, AUC `164.620 +/- 34.611`
-- `learned_tau_delay10_selfmodel_noerr`: final `175.754 +/- 58.281`, AUC `153.155 +/- 43.081`
+- `learned_tau_delay10`: final `214.513 +/- 85.890`, AUC `179.016 +/- 34.679`
+- `learned_tau_delay10_selfmodel`: final `229.079 +/- 90.789`, AUC `160.669 +/- 31.596`
+- `learned_tau_delay10_selfmodel_noerr`: final `166.977 +/- 52.895`, AUC `150.569 +/- 39.343`
 
 Signal columns:
 
-- `learned_tau_delay10_selfmodel`: `corr/tau_pred_error=0.641 +/- 0.120`
-- `learned_tau_delay10_selfmodel_noerr`: `corr/tau_pred_error=0.700 +/- 0.101`
+- `learned_tau_delay10_selfmodel`: `corr/tau_pred_error=0.666 +/- 0.115`
+- `learned_tau_delay10_selfmodel_noerr`: `corr/tau_pred_error=0.706 +/- 0.106`
 
 Interpretation:
 
-- Turning OFF the `pred_error -> tau` pathway reduces final performance (`249.198 -> 175.754`).
+- Turning OFF the `pred_error -> tau` pathway reduces final performance (`229.079 -> 166.977`).
 - With self-model training still enabled, performance drops below the learned Stage-1 delay baseline in this setting.
 - `corr/tau_pred_error` can stay non-zero as an observational correlation from shared latent dynamics; the intervention result above is the causal evidence.
 - This remains directionally consistent with the causal claim that Stage-2 improvement is carried by prediction-error-based time modulation.
@@ -142,15 +142,16 @@ Artifacts:
 Main paired results (`delta = selfmodel - comparator`, bootstrap 95% CI):
 
 - vs `learned_tau_delay10`:
-  - `final_mean`: `+16.513` (CI `[-75.805, 120.497]`)
-  - `AUC`: `-14.630` (CI `[-34.366, 7.844]`)
+  - `final_mean`: `+14.567` (CI `[-49.764, 85.432]`)
+  - `AUC`: `-18.348` (CI `[-36.348, 1.274]`)
 - vs `learned_tau_delay10_selfmodel_noerr`:
-  - `final_mean`: `+73.443` (CI `[-0.228, 158.792]`)
-  - `AUC`: `+11.465` (CI `[-15.534, 39.798]`)
+  - `final_mean`: `+62.102` (CI `[7.224, 124.360]`)
+  - `AUC`: `+10.099` (CI `[-10.801, 31.636]`)
 
 Interpretation:
 
-- Direction remains favorable for `selfmodel` on final score, but CIs are still close to/over zero at 10 seeds.
+- `selfmodel - noerr` final delta is now strictly positive at 95% CI lower bound (`+7.224`), which strengthens the causal ablation claim.
+- `selfmodel - learned` remains direction-positive but not significant at current variance.
 - AUC differences are unstable across comparators, so sample-efficiency claims are not yet fixed.
 
 ## Delay-Length Sweep (0 / 5 / 10 / 20)
@@ -191,6 +192,36 @@ Interpretation:
 - Direction is still delay-dependent but non-monotonic, and per-delay CIs still cross zero at this budget.
 - `delay=0/5` stay near zero or negative; `delay=10/20` are positive in mean but not yet conclusive.
 - Warmup/schedule is still the lowest-cost next step if we need stronger AUC and tighter separation.
+
+## Delay Group Difference (Low vs High, No Re-Training)
+
+We computed seed-matched group contrast from delay sweep deltas:
+
+- Low-delay group: `delay={0,5}`
+- High-delay group: `delay={10,20}`
+- Delta definition: `selfmodel - learned`
+
+Artifacts:
+
+- `docs/stage2_delay_group_diff_2026-02-16.csv`
+- `docs/stage2_delay_group_diff_per_seed_2026-02-16.csv`
+- `docs/stage2_delay_group_diff_2026-02-16.tex`
+
+Results (bootstrap 95% CI):
+
+- `final_mean`:
+  - Low-group delta mean: `-15.054`
+  - High-group delta mean: `+20.638`
+  - Group diff (`high - low`): `+35.692` (CI `[-44.409, 113.127]`)
+- `AUC`:
+  - Low-group delta mean: `-0.677`
+  - High-group delta mean: `-17.542`
+  - Group diff (`high - low`): `-16.864` (CI `[-46.469, 13.513]`)
+
+Interpretation:
+
+- The trend supports stronger final-score gains at higher delays, but CI still crosses zero.
+- Additional power, or a lower-variance training schedule (warmup), is required for a hard significance claim on delay-group contrast.
 
 ## Figures
 

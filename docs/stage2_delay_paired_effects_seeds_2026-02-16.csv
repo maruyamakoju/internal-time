@@ -9,6 +9,11 @@ learned_tau_delay10_selfmodel,learned_tau_delay10,auc,6,127.14375,133.7726562499
 learned_tau_delay10_selfmodel,learned_tau_delay10,auc,7,103.79479166666664,168.09661458333332,-64.30182291666668
 learned_tau_delay10_selfmodel,learned_tau_delay10,auc,8,205.40937500000004,145.5390625,59.87031250000004
 learned_tau_delay10_selfmodel,learned_tau_delay10,auc,9,197.72083333333333,170.67916666666665,27.041666666666686
+learned_tau_delay10_selfmodel,learned_tau_delay10,auc,10,152.14427083333334,221.44244791666665,-69.29817708333331
+learned_tau_delay10_selfmodel,learned_tau_delay10,auc,11,154.23515625000002,112.10781249999998,42.12734375000004
+learned_tau_delay10_selfmodel,learned_tau_delay10,auc,12,120.66927083333331,185.63802083333331,-64.96875
+learned_tau_delay10_selfmodel,learned_tau_delay10,auc,13,145.9625,171.77395833333333,-25.81145833333332
+learned_tau_delay10_selfmodel,learned_tau_delay10,auc,14,190.81901041666663,201.78828125000004,-10.969270833333411
 learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,auc,0,190.2244791666667,253.2791666666667,-63.0546875
 learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,auc,1,180.70625000000004,169.08671875,11.619531250000051
 learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,auc,2,117.32473958333333,126.5703125,-9.245572916666674
@@ -19,6 +24,11 @@ learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,auc,6,127.1437
 learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,auc,7,103.79479166666664,131.40208333333334,-27.607291666666697
 learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,auc,8,205.40937500000004,102.80078125,102.60859375000004
 learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,auc,9,197.72083333333333,165.69973958333335,32.02109374999998
+learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,auc,10,152.14427083333334,186.23489583333333,-34.09062499999999
+learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,auc,11,154.23515625000002,108.55182291666668,45.68333333333334
+learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,auc,12,120.66927083333331,121.33567708333332,-0.6664062500000085
+learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,auc,13,145.9625,173.49348958333334,-27.530989583333337
+learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,auc,14,190.81901041666663,137.37578125000002,53.44322916666661
 learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,0,479.05,127.875,351.175
 learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,1,309.975,191.045,118.93000000000004
 learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,2,182.19,141.33499999999998,40.85500000000002
@@ -29,6 +39,11 @@ learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,6,163.3349999999999
 learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,7,132.00999999999996,241.135,-109.12500000000003
 learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,8,308.00000000000006,120.455,187.54500000000007
 learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,9,237.355,277.8,-40.44500000000002
+learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,10,180.81,159.935,20.875
+learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,11,192.67,112.125,80.54499999999999
+learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,12,138.4,131.85500000000002,6.5449999999999875
+learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,13,140.065,265.9,-125.83499999999998
+learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,14,292.27,221.035,71.23499999999999
 learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,final_mean,0,479.05,119.73,359.32
 learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,final_mean,1,309.975,292.795,17.180000000000007
 learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,final_mean,2,182.19,169.445,12.745000000000005
@@ -39,3 +54,8 @@ learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,final_mean,6,1
 learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,final_mean,7,132.00999999999996,267.015,-135.00500000000002
 learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,final_mean,8,308.00000000000006,108.82,199.18000000000006
 learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,final_mean,9,237.355,122.165,115.18999999999998
+learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,final_mean,10,180.81,210.45,-29.639999999999986
+learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,final_mean,11,192.67,114.575,78.09499999999998
+learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,final_mean,12,138.4,137.97,0.4300000000000068
+learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,final_mean,13,140.065,158.07,-18.004999999999995
+learned_tau_delay10_selfmodel,learned_tau_delay10_selfmodel_noerr,final_mean,14,292.27,126.04999999999998,166.22

@@ -7,4 +7,5 @@ runs/
 outputs/
 *.pt
 *.png
-
+!docs/figures/fig_stage2_delay_sweep_final.png
+!docs/figures/fig_stage2_delay_sweep_paired_delta.png
