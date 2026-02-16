@@ -44,6 +44,8 @@ class PPOConfig:
     discount_mode: str = "fixed"
     max_discount_exponent: float = 10.0
     lambda_self: float = 0.0
+    pred_error_tau_warmup_timesteps: float = 0.0
+    lambda_self_warmup_timesteps: float = 0.0
 
 
 class CSVLogger:
@@ -291,6 +293,8 @@ def _build_ppo_cfg(cfg: DictConfig) -> PPOConfig:
         discount_mode=str(cfg.train.get("discount_mode", "fixed")),
         max_discount_exponent=float(cfg.train.get("max_discount_exponent", 10.0)),
         lambda_self=float(cfg.train.get("lambda_self", 0.0)),
+        pred_error_tau_warmup_timesteps=float(cfg.train.get("pred_error_tau_warmup_timesteps", 0.0)),
+        lambda_self_warmup_timesteps=float(cfg.train.get("lambda_self_warmup_timesteps", 0.0)),
     )
 
 
@@ -332,6 +336,12 @@ def _safe_corr(a: np.ndarray, b: np.ndarray) -> float:
     if np.std(a) < 1e-12 or np.std(b) < 1e-12:
         return float("nan")
     return float(np.corrcoef(a, b)[0, 1])
+
+
+def _linear_warmup_scale(global_step: int, warmup_timesteps: float) -> float:
+    if warmup_timesteps <= 0:
+        return 1.0
+    return float(min(1.0, max(0.0, global_step / max(1.0, warmup_timesteps))))
 
 
 def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
@@ -421,10 +431,16 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
             global_step += ppo_cfg.num_envs
             h_prev_step = hidden_t.clone()
             obs_norm_t = torch.linalg.vector_norm(obs_t.view(obs_t.shape[0], -1), dim=-1)
+            pred_error_tau_scale_rollout = _linear_warmup_scale(
+                global_step, ppo_cfg.pred_error_tau_warmup_timesteps
+            )
 
             with torch.no_grad():
                 action, log_prob, value, _, h_next, delta_tau, _, pred_error, _ = policy.act(
-                    obs_t, hidden_t, deterministic=False
+                    obs_t,
+                    hidden_t,
+                    deterministic=False,
+                    tau_extra_scale=pred_error_tau_scale_rollout,
                 )
 
             np_action = _to_numpy_action(action, discrete=discrete_action)
@@ -487,7 +503,15 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
                 episode_lengths.append(ep["l"])
 
         with torch.no_grad():
-            _, _, next_value, _, _, _, _, _, _ = policy.act(obs_t, hidden_t, deterministic=True)
+            pred_error_tau_scale_update = _linear_warmup_scale(
+                global_step, ppo_cfg.pred_error_tau_warmup_timesteps
+            )
+            _, _, next_value, _, _, _, _, _, _ = policy.act(
+                obs_t,
+                hidden_t,
+                deterministic=True,
+                tau_extra_scale=pred_error_tau_scale_update,
+            )
 
         buffer.compute_returns_and_advantages(
             next_value=next_value,
@@ -511,6 +535,13 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
         batch_size = b_obs.shape[0]
         mini_batch_size = min(ppo_cfg.mini_batch_size, batch_size)
         indices = np.arange(batch_size)
+        pred_error_tau_scale_update = _linear_warmup_scale(
+            global_step, ppo_cfg.pred_error_tau_warmup_timesteps
+        )
+        lambda_self_scale_update = _linear_warmup_scale(
+            global_step, ppo_cfg.lambda_self_warmup_timesteps
+        )
+        lambda_self_effective = ppo_cfg.lambda_self * lambda_self_scale_update
 
         clipfracs: list[float] = []
         epoch_policy_losses: list[float] = []
@@ -547,7 +578,10 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
                     pred_error,
                     self_model_loss,
                 ) = policy.evaluate_actions(
-                    mb_obs, mb_actions, mb_h_prev
+                    mb_obs,
+                    mb_actions,
+                    mb_h_prev,
+                    tau_extra_scale=pred_error_tau_scale_update,
                 )
 
                 log_ratio = new_log_prob - mb_old_log_probs
@@ -593,7 +627,7 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
                     + ppo_cfg.vf_coef * value_loss
                     - ppo_cfg.ent_coef * entropy_loss
                     + time_loss
-                    + ppo_cfg.lambda_self * self_model_loss
+                    + lambda_self_effective * self_model_loss
                 )
 
                 optimizer.zero_grad()
@@ -654,6 +688,9 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
             "global_step": global_step,
             "model/transition_mode": policy_cfg.transition_mode,
             "train/discount_mode": ppo_cfg.discount_mode,
+            "sched/pred_error_tau_scale": pred_error_tau_scale_update,
+            "sched/lambda_self_scale": lambda_self_scale_update,
+            "sched/lambda_self_effective": lambda_self_effective,
             "sps": sps,
             "lr": optimizer.param_groups[0]["lr"],
             "loss/policy": float(np.mean(epoch_policy_losses)),

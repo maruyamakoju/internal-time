@@ -117,7 +117,10 @@ class InternalTimeActorCritic(nn.Module):
         return obs.view(obs.shape[0], -1)
 
     def _forward_transition(
-        self, obs: torch.Tensor, h_prev: torch.Tensor
+        self,
+        obs: torch.Tensor,
+        h_prev: torch.Tensor,
+        tau_extra_scale: float = 1.0,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         obs = self._flatten_obs(obs)
         x = self.encoder(obs)
@@ -158,8 +161,9 @@ class InternalTimeActorCritic(nn.Module):
                 raise RuntimeError("time_head is not initialized in learned mode.")
             tau_extra = None
             if self.use_self_model:
+                tau_scale = max(0.0, float(tau_extra_scale))
                 if self.cfg.use_pred_error_for_tau:
-                    tau_extra = pred_error.detach().unsqueeze(-1)
+                    tau_extra = (pred_error.detach() * tau_scale).unsqueeze(-1)
                 else:
                     # Keep input dimensionality/parameter count unchanged for fair ablation.
                     tau_extra = torch.zeros_like(pred_error).unsqueeze(-1)
@@ -178,7 +182,11 @@ class InternalTimeActorCritic(nn.Module):
         return Normal(mean, std)
 
     def act(
-        self, obs: torch.Tensor, h_prev: torch.Tensor, deterministic: bool = False
+        self,
+        obs: torch.Tensor,
+        h_prev: torch.Tensor,
+        deterministic: bool = False,
+        tau_extra_scale: float = 1.0,
     ) -> tuple[
         torch.Tensor,
         torch.Tensor,
@@ -190,7 +198,9 @@ class InternalTimeActorCritic(nn.Module):
         torch.Tensor,
         torch.Tensor,
     ]:
-        h_next, delta_tau, raw_tau, pred_error, self_model_loss = self._forward_transition(obs, h_prev)
+        h_next, delta_tau, raw_tau, pred_error, self_model_loss = self._forward_transition(
+            obs, h_prev, tau_extra_scale=tau_extra_scale
+        )
         dist = self._distribution(h_next)
 
         if deterministic:
@@ -212,7 +222,11 @@ class InternalTimeActorCritic(nn.Module):
         return action, log_prob, value, entropy, h_next, delta_tau, raw_tau, pred_error, self_model_loss
 
     def evaluate_actions(
-        self, obs: torch.Tensor, actions: torch.Tensor, h_prev: torch.Tensor
+        self,
+        obs: torch.Tensor,
+        actions: torch.Tensor,
+        h_prev: torch.Tensor,
+        tau_extra_scale: float = 1.0,
     ) -> tuple[
         torch.Tensor,
         torch.Tensor,
@@ -222,7 +236,9 @@ class InternalTimeActorCritic(nn.Module):
         torch.Tensor,
         torch.Tensor,
     ]:
-        h_next, delta_tau, raw_tau, pred_error, self_model_loss = self._forward_transition(obs, h_prev)
+        h_next, delta_tau, raw_tau, pred_error, self_model_loss = self._forward_transition(
+            obs, h_prev, tau_extra_scale=tau_extra_scale
+        )
         dist = self._distribution(h_next)
         if self.discrete_action:
             log_prob = dist.log_prob(actions.long())

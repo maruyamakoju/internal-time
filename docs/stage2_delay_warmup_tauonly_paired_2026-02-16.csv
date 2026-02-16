@@ -1,0 +1,3 @@
+anchor,comparator,metric,n_pairs,delta_mean,delta_std,ci95_low,ci95_high,delta_min,delta_max,n_positive,n_negative,n_zero
+learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,5,-12.911000000000001,93.19841427835563,-91.46100000000001,67.98600000000003,-112.51999999999998,135.96000000000004,2,3,0
+learned_tau_delay10_selfmodel,learned_tau_delay10,auc,5,-45.65984375000001,50.194695988810146,-92.63942708333335,-7.5118749999999865,-136.1424479166667,5.666406250000023,1,4,0

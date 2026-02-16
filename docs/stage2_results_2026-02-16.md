@@ -223,6 +223,37 @@ Interpretation:
 - The trend supports stronger final-score gains at higher delays, but CI still crosses zero.
 - Additional power, or a lower-variance training schedule (warmup), is required for a hard significance claim on delay-group contrast.
 
+## Warmup Search (Performance-Focused)
+
+We added two schedule controls:
+
+- `train.pred_error_tau_warmup_timesteps`
+- `train.lambda_self_warmup_timesteps`
+
+and evaluated delay-biased `delay=10` with `learned_tau_delay10` vs `learned_tau_delay10_selfmodel`.
+
+Settings compared:
+
+- `both50k`: both warmups = `50000`
+- `tauonly50k`: `pred_error_tau_warmup=50000`, `lambda_self_warmup=0`
+- `lambdaonly50k`: `pred_error_tau_warmup=0`, `lambda_self_warmup=50000`
+- `both20k`: both warmups = `20000`
+
+Machine-readable summary:
+
+- `docs/stage2_warmup_search_2026-02-16.csv`
+
+Best result (`both20k`, 10 seeds, root `runs/sweeps/stage2_delay_delaybiased_warmup_both20k_v1`):
+
+- Paired final delta (`selfmodel - learned`): `+95.560` (CI `[22.421, 170.151]`)
+- Paired AUC delta (`selfmodel - learned`): `+24.306` (CI `[-3.725, 57.548]`)
+
+Interpretation:
+
+- Warmup converted delay=10 from inconclusive (`selfmodel - learned` CI crossing zero) to a positive final-performance gap with CI lower bound above zero.
+- AUC also improved in mean, but CI still crosses zero, so sample-efficiency superiority is not yet fixed.
+- `tauonly50k` and `lambdaonly50k` both underperformed, indicating that balanced short warmup is the stable direction rather than one-sided long warmup.
+
 ## Figures
 
 - `runs/sweeps/stage2_delay_lm0_lv1e-2/aggregate/learning_curves.png`
@@ -245,3 +276,7 @@ Interpretation:
 - `runs/sweeps/stage2_delay_sweep/delay20/aggregate/final_performance.png`
 - `docs/figures/fig_stage2_delay_sweep_final.png`
 - `docs/figures/fig_stage2_delay_sweep_paired_delta.png`
+- `runs/sweeps/stage2_delay_delaybiased_warmup_both20k_v1/aggregate/learning_curves.png`
+- `runs/sweeps/stage2_delay_delaybiased_warmup_both20k_v1/aggregate/final_performance.png`
+- `docs/figures/fig_stage2_delay_warmup_both20k_learning_curves.png`
+- `docs/figures/fig_stage2_delay_warmup_both20k_final.png`

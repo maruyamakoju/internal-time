@@ -24,6 +24,8 @@ train:
   discount_mode: fixed
   max_discount_exponent: 10.0
   lambda_self: 0.0
+  pred_error_tau_warmup_timesteps: 0
+  lambda_self_warmup_timesteps: 0
 
 env:
   id: CartPole-v1
