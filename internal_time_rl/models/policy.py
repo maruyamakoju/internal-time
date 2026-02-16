@@ -24,6 +24,8 @@ class PolicyConfig:
     transition_mode: str = "learned"
     fixed_tau: float = 1.0
     standard_tau_proxy: float = 10.0
+    use_self_model: bool = False
+    self_model_hidden_dim: int = 128
     time_reg: TimeRegConfig = field(default_factory=TimeRegConfig)
 
 
@@ -61,10 +63,18 @@ class InternalTimeActorCritic(nn.Module):
             activation=activation,
         )
         self.gru_cell = nn.GRUCell(cfg.obs_embed_dim, cfg.hidden_dim)
+        self.use_self_model = bool(cfg.use_self_model)
+        self.self_model: nn.Module | None = None
+        if self.use_self_model:
+            self.self_model = nn.Sequential(
+                nn.Linear(cfg.hidden_dim, cfg.self_model_hidden_dim),
+                activation(),
+                nn.Linear(cfg.self_model_hidden_dim, cfg.hidden_dim),
+            )
         self.time_head: InternalTimeHead | None = None
         if self.transition_mode == "learned":
             self.time_head = InternalTimeHead(
-                in_dim=cfg.hidden_dim + cfg.obs_embed_dim,
+                in_dim=cfg.hidden_dim + cfg.obs_embed_dim + (1 if self.use_self_model else 0),
                 hidden_dim=cfg.time_head_hidden_dim,
                 min_tau=cfg.min_tau,
             )
@@ -107,10 +117,20 @@ class InternalTimeActorCritic(nn.Module):
 
     def _forward_transition(
         self, obs: torch.Tensor, h_prev: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         obs = self._flatten_obs(obs)
         x = self.encoder(obs)
         h_candidate = self.gru_cell(x, h_prev)
+        pred_error = torch.zeros((obs.shape[0],), dtype=obs.dtype, device=obs.device)
+        self_model_loss = torch.zeros((), dtype=obs.dtype, device=obs.device)
+        if self.use_self_model:
+            if self.self_model is None:
+                raise RuntimeError("self_model is not initialized.")
+            h_hat = self.self_model(h_prev)
+            diff = h_candidate.detach() - h_hat
+            pred_error_sq = diff.square().mean(dim=-1)
+            pred_error = torch.sqrt(pred_error_sq + 1e-8)
+            self_model_loss = pred_error_sq.mean()
 
         if self.transition_mode == "standard":
             # Pure GRU transition (no temporal mixing) for a fair standard baseline.
@@ -122,7 +142,7 @@ class InternalTimeActorCritic(nn.Module):
                 device=obs.device,
             )
             raw_tau = torch.log(delta_tau + 1e-8)
-            return h_next, delta_tau, raw_tau
+            return h_next, delta_tau, raw_tau, pred_error, self_model_loss
 
         if self.transition_mode == "fixed":
             delta_tau = torch.full(
@@ -135,11 +155,12 @@ class InternalTimeActorCritic(nn.Module):
         else:
             if self.time_head is None:
                 raise RuntimeError("time_head is not initialized in learned mode.")
-            delta_tau, raw_tau = self.time_head(h_prev, x)
+            tau_extra = pred_error.detach().unsqueeze(-1) if self.use_self_model else None
+            delta_tau, raw_tau = self.time_head(h_prev, x, extra=tau_extra)
 
         alpha = InternalTimeHead.time_alpha(delta_tau).unsqueeze(-1)
         h_next = (1.0 - alpha) * h_prev + alpha * h_candidate
-        return h_next, delta_tau, raw_tau
+        return h_next, delta_tau, raw_tau, pred_error, self_model_loss
 
     def _distribution(self, latent: torch.Tensor):
         if self.discrete_action:
@@ -159,8 +180,10 @@ class InternalTimeActorCritic(nn.Module):
         torch.Tensor,
         torch.Tensor,
         torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
     ]:
-        h_next, delta_tau, raw_tau = self._forward_transition(obs, h_prev)
+        h_next, delta_tau, raw_tau, pred_error, self_model_loss = self._forward_transition(obs, h_prev)
         dist = self._distribution(h_next)
 
         if deterministic:
@@ -179,12 +202,20 @@ class InternalTimeActorCritic(nn.Module):
             entropy = dist.entropy().sum(dim=-1)
 
         value = self.value_head(h_next).squeeze(-1)
-        return action, log_prob, value, entropy, h_next, delta_tau, raw_tau
+        return action, log_prob, value, entropy, h_next, delta_tau, raw_tau, pred_error, self_model_loss
 
     def evaluate_actions(
         self, obs: torch.Tensor, actions: torch.Tensor, h_prev: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        h_next, delta_tau, raw_tau = self._forward_transition(obs, h_prev)
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+    ]:
+        h_next, delta_tau, raw_tau, pred_error, self_model_loss = self._forward_transition(obs, h_prev)
         dist = self._distribution(h_next)
         if self.discrete_action:
             log_prob = dist.log_prob(actions.long())
@@ -193,4 +224,4 @@ class InternalTimeActorCritic(nn.Module):
             log_prob = dist.log_prob(actions).sum(dim=-1)
             entropy = dist.entropy().sum(dim=-1)
         value = self.value_head(h_next).squeeze(-1)
-        return log_prob, entropy, value, delta_tau, raw_tau
+        return log_prob, entropy, value, delta_tau, raw_tau, pred_error, self_model_loss

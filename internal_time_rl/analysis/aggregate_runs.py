@@ -118,6 +118,10 @@ def main() -> None:
         "corr/tau_abs_adv",
         "corr/tau_abs_td",
         "corr/tau_action_repeat",
+        "corr/tau_pred_error",
+        "pred_error/mean",
+        "pred_error/mean_mb",
+        "loss/self_model",
     ]
 
     for run in runs:
@@ -231,4 +235,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

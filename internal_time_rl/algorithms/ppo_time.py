@@ -43,6 +43,7 @@ class PPOConfig:
     anneal_lr: bool = True
     discount_mode: str = "fixed"
     max_discount_exponent: float = 10.0
+    lambda_self: float = 0.0
 
 
 class CSVLogger:
@@ -93,6 +94,7 @@ class RolloutBuffer:
         self.h_prev = torch.zeros((rollout_steps, num_envs, hidden_dim), dtype=torch.float32, device=device)
         self.delta_tau = torch.zeros((rollout_steps, num_envs), dtype=torch.float32, device=device)
         self.td_error = torch.zeros((rollout_steps, num_envs), dtype=torch.float32, device=device)
+        self.pred_error = torch.zeros((rollout_steps, num_envs), dtype=torch.float32, device=device)
         self.obs_norm = torch.zeros((rollout_steps, num_envs), dtype=torch.float32, device=device)
         self.action_repeat = torch.ones((rollout_steps, num_envs), dtype=torch.float32, device=device)
         self.discount_exponent = torch.ones((rollout_steps, num_envs), dtype=torch.float32, device=device)
@@ -111,6 +113,7 @@ class RolloutBuffer:
         value: torch.Tensor,
         h_prev: torch.Tensor,
         delta_tau: torch.Tensor,
+        pred_error: torch.Tensor,
         obs_norm: torch.Tensor,
         action_repeat: torch.Tensor,
         discount_exponent: torch.Tensor,
@@ -123,6 +126,7 @@ class RolloutBuffer:
         self.values[step].copy_(value)
         self.h_prev[step].copy_(h_prev)
         self.delta_tau[step].copy_(delta_tau)
+        self.pred_error[step].copy_(pred_error)
         self.obs_norm[step].copy_(obs_norm)
         self.action_repeat[step].copy_(action_repeat)
         self.discount_exponent[step].copy_(discount_exponent)
@@ -159,6 +163,7 @@ class RolloutBuffer:
             "values": self.values.reshape(-1),
             "h_prev": self.h_prev.reshape((-1, self.h_prev.shape[-1])),
             "delta_tau": self.delta_tau.reshape(-1),
+            "pred_error": self.pred_error.reshape(-1),
             "td_error": self.td_error.reshape(-1),
             "obs_norm": self.obs_norm.reshape(-1),
             "action_repeat": self.action_repeat.reshape(-1),
@@ -258,6 +263,8 @@ def _build_policy_cfg(cfg: DictConfig) -> PolicyConfig:
         transition_mode=transition_mode,
         fixed_tau=float(cfg.model.fixed_tau),
         standard_tau_proxy=float(cfg.model.get("standard_tau_proxy", 10.0)),
+        use_self_model=bool(cfg.model.get("use_self_model", False)),
+        self_model_hidden_dim=int(cfg.model.get("self_model_hidden_dim", cfg.model.hidden_dim)),
         time_reg=time_reg,
     )
 
@@ -282,6 +289,7 @@ def _build_ppo_cfg(cfg: DictConfig) -> PPOConfig:
         anneal_lr=bool(cfg.train.anneal_lr),
         discount_mode=str(cfg.train.get("discount_mode", "fixed")),
         max_discount_exponent=float(cfg.train.get("max_discount_exponent", 10.0)),
+        lambda_self=float(cfg.train.get("lambda_self", 0.0)),
     )
 
 
@@ -414,7 +422,7 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
             obs_norm_t = torch.linalg.vector_norm(obs_t.view(obs_t.shape[0], -1), dim=-1)
 
             with torch.no_grad():
-                action, log_prob, value, _, h_next, delta_tau, _ = policy.act(
+                action, log_prob, value, _, h_next, delta_tau, _, pred_error, _ = policy.act(
                     obs_t, hidden_t, deterministic=False
                 )
 
@@ -458,6 +466,7 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
                 value=value,
                 h_prev=h_prev_step,
                 delta_tau=delta_tau,
+                pred_error=pred_error,
                 obs_norm=obs_norm_t,
                 action_repeat=action_repeat_t,
                 discount_exponent=discount_exponent_t,
@@ -477,7 +486,7 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
                 episode_lengths.append(ep["l"])
 
         with torch.no_grad():
-            _, _, next_value, _, _, _, _ = policy.act(obs_t, hidden_t, deterministic=True)
+            _, _, next_value, _, _, _, _, _, _ = policy.act(obs_t, hidden_t, deterministic=True)
 
         buffer.compute_returns_and_advantages(
             next_value=next_value,
@@ -507,6 +516,8 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
         epoch_value_losses: list[float] = []
         epoch_entropy: list[float] = []
         epoch_time_losses: list[float] = []
+        epoch_self_losses: list[float] = []
+        epoch_pred_errors: list[float] = []
         epoch_approx_kl: list[float] = []
         epoch_tau_means: list[float] = []
         epoch_tau_vars: list[float] = []
@@ -526,7 +537,15 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
                 mb_old_values = b_values[mb_idx]
                 mb_h_prev = b_h_prev[mb_idx]
 
-                new_log_prob, entropy, new_value, delta_tau, raw_tau = policy.evaluate_actions(
+                (
+                    new_log_prob,
+                    entropy,
+                    new_value,
+                    delta_tau,
+                    raw_tau,
+                    pred_error,
+                    self_model_loss,
+                ) = policy.evaluate_actions(
                     mb_obs, mb_actions, mb_h_prev
                 )
 
@@ -573,6 +592,7 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
                     + ppo_cfg.vf_coef * value_loss
                     - ppo_cfg.ent_coef * entropy_loss
                     + time_loss
+                    + ppo_cfg.lambda_self * self_model_loss
                 )
 
                 optimizer.zero_grad()
@@ -589,6 +609,8 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
                 epoch_value_losses.append(float(value_loss.detach().cpu()))
                 epoch_entropy.append(float(entropy_loss.detach().cpu()))
                 epoch_time_losses.append(float(time_loss.detach().cpu()))
+                epoch_self_losses.append(float(self_model_loss.detach().cpu()))
+                epoch_pred_errors.append(float(pred_error.mean().detach().cpu()))
                 epoch_approx_kl.append(float(approx_kl))
                 epoch_tau_means.append(time_metrics["tau_mean"])
                 epoch_tau_vars.append(time_metrics["tau_var"])
@@ -604,6 +626,7 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
         explained_var = _explained_variance(y_pred, y_true)
 
         flat_tau = batch["delta_tau"].detach().cpu().numpy()
+        flat_pred_error = batch["pred_error"].detach().cpu().numpy()
         flat_adv_abs = batch["advantages"].abs().detach().cpu().numpy()
         flat_td_abs = batch["td_error"].abs().detach().cpu().numpy()
         flat_obs_norm = batch["obs_norm"].detach().cpu().numpy()
@@ -613,6 +636,7 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
         corr_tau_adv = _safe_corr(flat_tau, flat_adv_abs)
         corr_tau_td = _safe_corr(flat_tau, flat_td_abs)
         corr_tau_repeat = _safe_corr(flat_tau, flat_action_repeat)
+        corr_tau_pred_error = _safe_corr(flat_tau, flat_pred_error)
 
         obs_zero_threshold = float(cfg.logging.get("obs_zero_threshold", 1e-8))
         zero_mask = flat_obs_norm <= obs_zero_threshold
@@ -635,6 +659,7 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
             "loss/value": float(np.mean(epoch_value_losses)),
             "loss/entropy": float(np.mean(epoch_entropy)),
             "loss/time_reg": float(np.mean(epoch_time_losses)),
+            "loss/self_model": float(np.mean(epoch_self_losses)) if epoch_self_losses else 0.0,
             "approx_kl": float(np.mean(epoch_approx_kl)),
             "clipfrac": float(np.mean(clipfracs)),
             "explained_variance": float(explained_var),
@@ -647,6 +672,9 @@ def train_ppo_with_internal_time(cfg: DictConfig) -> dict[str, Any]:
             "corr/tau_abs_adv": corr_tau_adv,
             "corr/tau_abs_td": corr_tau_td,
             "corr/tau_action_repeat": corr_tau_repeat,
+            "corr/tau_pred_error": corr_tau_pred_error,
+            "pred_error/mean": float(np.mean(flat_pred_error)),
+            "pred_error/mean_mb": float(np.mean(epoch_pred_errors)) if epoch_pred_errors else 0.0,
             "adv/abs_mean": float(np.mean(flat_adv_abs)),
             "td/abs_mean": float(np.mean(flat_td_abs)),
             "repeat/mean": float(np.mean(flat_action_repeat)),

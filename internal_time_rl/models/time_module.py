@@ -28,8 +28,18 @@ class InternalTimeHead(nn.Module):
             nn.Linear(hidden_dim, 1),
         )
 
-    def forward(self, h: torch.Tensor, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        z = torch.cat([h, x], dim=-1)
+    def forward(
+        self,
+        h: torch.Tensor,
+        x: torch.Tensor,
+        extra: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        features = [h, x]
+        if extra is not None:
+            if extra.dim() == 1:
+                extra = extra.unsqueeze(-1)
+            features.append(extra)
+        z = torch.cat(features, dim=-1)
         raw = self.net(z).squeeze(-1)
         delta_tau = F.softplus(raw) + self.min_tau
         return delta_tau, raw
@@ -75,4 +85,3 @@ class InternalTimeHead(nn.Module):
             metrics["tau_kl"] = 0.0
 
         return loss, metrics
-

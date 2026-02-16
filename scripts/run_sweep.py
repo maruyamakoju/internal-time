@@ -152,6 +152,45 @@ CONDITION_SUITES: dict[str, dict[str, list[str]]] = {
             "train.discount_mode=internal_tau",
         ],
     },
+    "stage2_delay": {
+        "standard_gru_delay10": [
+            "model.transition_mode=standard",
+            "model.use_self_model=false",
+            "train.lambda_self=0.0",
+            "env.reward_delay=10",
+            "env.flicker_prob=0.0",
+            "env.variable_speed=false",
+            "train.discount_mode=fixed",
+        ],
+        "fixed_tau_10_delay10": [
+            "model.transition_mode=fixed",
+            "model.fixed_tau=10.0",
+            "model.use_self_model=false",
+            "train.lambda_self=0.0",
+            "env.reward_delay=10",
+            "env.flicker_prob=0.0",
+            "env.variable_speed=false",
+            "train.discount_mode=fixed",
+        ],
+        "learned_tau_delay10": [
+            "model.transition_mode=learned",
+            "model.use_self_model=false",
+            "train.lambda_self=0.0",
+            "env.reward_delay=10",
+            "env.flicker_prob=0.0",
+            "env.variable_speed=false",
+            "train.discount_mode=fixed",
+        ],
+        "learned_tau_delay10_selfmodel": [
+            "model.transition_mode=learned",
+            "model.use_self_model=true",
+            "train.lambda_self=0.1",
+            "env.reward_delay=10",
+            "env.flicker_prob=0.0",
+            "env.variable_speed=false",
+            "train.discount_mode=fixed",
+        ],
+    },
 }
 
 

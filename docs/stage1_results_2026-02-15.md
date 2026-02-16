@@ -6,6 +6,8 @@ This file fixes the current Stage-1 status after protocol freeze and multi-seed 
 
 - Commit: `1c69995`
 - Tag: `stage1_spec_v1`
+- Defense freeze commit: `89f7631`
+- Defense freeze tag: `stage1_defense_v2`
 - Key fixes included:
   - `corr/tau_abs_td` uses true one-step TD error (`r + gamma * V(next) - V(now)`)
   - `num_updates < 1` now hard-fails early
@@ -256,3 +258,4 @@ Machine-readable summary table:
 
 - `docs/stage1_controls_summary_2026-02-15.csv`
 - `docs/stage1_key_table.csv`
+- `docs/stage1_key_table.tex`

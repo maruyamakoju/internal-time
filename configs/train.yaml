@@ -23,6 +23,7 @@ train:
   anneal_lr: true
   discount_mode: fixed
   max_discount_exponent: 10.0
+  lambda_self: 0.0
 
 env:
   id: CartPole-v1
@@ -43,6 +44,8 @@ model:
   transition_mode: learned
   fixed_tau: 1.0
   standard_tau_proxy: 10.0
+  use_self_model: false
+  self_model_hidden_dim: 128
 
 time_reg:
   lambda_var: 0.01
