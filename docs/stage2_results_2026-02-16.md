@@ -126,6 +126,72 @@ Interpretation:
 - `corr/tau_pred_error` can stay non-zero as an observational correlation from shared latent dynamics; the intervention result above is the causal evidence.
 - This supports the causal claim that Stage-2 improvement in delay-biased setup comes from using prediction error to modulate internal time.
 
+## Paired Effects (Seed-Matched, No Re-Training)
+
+We computed paired seed-wise deltas from:
+
+- `runs/sweeps/stage2_delay_delaybiased_ls3e-1/aggregate/per_run_summary.csv`
+- Script: `python -m internal_time_rl.analysis.paired_effects ...`
+
+Artifacts:
+
+- `docs/stage2_delay_paired_effects_2026-02-16.csv`
+- `docs/stage2_delay_paired_effects_seeds_2026-02-16.csv`
+- `docs/stage2_delay_paired_effects_2026-02-16.tex`
+
+Main paired results (`delta = selfmodel - comparator`, bootstrap 95% CI):
+
+- vs `learned_tau_delay10`:
+  - `final_mean`: `+61.332` (CI `[-80.034, 225.111]`)
+  - `AUC`: `-27.331` (CI `[-40.266, -13.174]`)
+- vs `learned_tau_delay10_selfmodel_noerr`:
+  - `final_mean`: `+110.184` (CI `[16.749, 245.697]`)
+  - `AUC`: `-4.142` (CI `[-37.358, 23.977]`)
+
+Interpretation:
+
+- Final-score lift vs `noerr` remains robust under seed-matched pairing.
+- Sample-efficiency cost (AUC) remains the main downside at this setting.
+
+## Delay-Length Sweep (0 / 5 / 10 / 20)
+
+Protocol:
+
+- Root: `runs/sweeps/stage2_delay_sweep`
+- Conditions: `learned_tau_delay10` vs `learned_tau_delay10_selfmodel`
+- Shared overrides:
+  - `time_reg.lambda_mean=1e-3`
+  - `time_reg.lambda_var=1e-2`
+  - `train.lambda_self=0.3`
+- Budget: 5 seeds, 200k per seed, per delay
+
+Summary artifacts:
+
+- `docs/stage2_delay_sweep_summary_2026-02-16.csv`
+- `docs/stage2_delay_sweep_summary_2026-02-16.tex`
+- `docs/figures/fig_stage2_delay_sweep_final.png`
+- `docs/figures/fig_stage2_delay_sweep_paired_delta.png`
+
+Paired final deltas (`selfmodel - learned`):
+
+- `delay=0`: `-25.235` (CI `[-116.374, 61.516]`)
+- `delay=5`: `-24.417` (CI `[-107.039, 60.807]`)
+- `delay=10`: `+61.332` (CI `[-80.034, 225.111]`)
+- `delay=20`: `+23.571` (CI `[-43.211, 112.324]`)
+
+Paired AUC deltas (`selfmodel - learned`):
+
+- `delay=0`: `-18.116`
+- `delay=5`: `-4.831`
+- `delay=10`: `-27.331`
+- `delay=20`: `-35.889`
+
+Interpretation:
+
+- Improvement is delay-dependent but not monotonic in this budget.
+- The strongest positive point appears at `delay=10`; short delays (`0/5`) do not benefit.
+- Across all delays here, AUC tends to drop for self-model, so warmup/schedule remains the next low-cost optimization axis.
+
 ## Figures
 
 - `runs/sweeps/stage2_delay_lm0_lv1e-2/aggregate/learning_curves.png`
@@ -142,3 +208,9 @@ Interpretation:
 - `docs/figures/fig_stage2_delay_delaybiased_best_final.png`
 - `docs/figures/fig_stage2_delay_delaybiased_ablation_noerr_learning_curves.png`
 - `docs/figures/fig_stage2_delay_delaybiased_ablation_noerr_final.png`
+- `runs/sweeps/stage2_delay_sweep/delay0/aggregate/final_performance.png`
+- `runs/sweeps/stage2_delay_sweep/delay5/aggregate/final_performance.png`
+- `runs/sweeps/stage2_delay_sweep/delay10/aggregate/final_performance.png`
+- `runs/sweeps/stage2_delay_sweep/delay20/aggregate/final_performance.png`
+- `docs/figures/fig_stage2_delay_sweep_final.png`
+- `docs/figures/fig_stage2_delay_sweep_paired_delta.png`
