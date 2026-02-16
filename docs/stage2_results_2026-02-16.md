@@ -1,6 +1,6 @@
 # Stage-2 Delay Results (2026-02-16)
 
-This file records the first Stage-2 run after Stage-1 freeze (`stage1_defense_v2`).
+This file records Stage-2 delay experiments after Stage-1 freeze (`stage1_defense_v2`).
 
 ## Protocol
 
@@ -37,19 +37,58 @@ Interpretation:
 - The new Stage-2 signal is active and non-degenerate (`corr/tau_pred_error` is finite and positive).
 - At current settings, Stage-2 does **not** improve delay return over Stage-1 learned baseline.
 
-## Immediate Next Tuning Axis
+## Lambda_self Sweep (Architecture Fixed)
 
-Keep architecture fixed and sweep only `train.lambda_self` first, e.g.:
+We ran the self-model condition only, keeping all other settings fixed:
 
-- `0.01`
-- `0.03`
-- `0.1` (current)
+- `runs/sweeps/stage2_delay_ls1e-2_lm0_lv1e-2` (`lambda_self=0.01`)
+- `runs/sweeps/stage2_delay_ls3e-2_lm0_lv1e-2` (`lambda_self=0.03`)
+- `runs/sweeps/stage2_delay_ls3e-1_lm0_lv1e-2` (`lambda_self=0.3`)
 
-Then rerun `stage2_delay` and compare:
+Final means (`learned_tau_delay10_selfmodel`, 5 seeds):
 
-- `learned_tau_delay10_selfmodel` vs `learned_tau_delay10`
-- `corr/tau_pred_error`
-- `pred_error/mean` trend
+- `lambda_self=0.01`: `201.725 +/- 75.494`
+- `lambda_self=0.03`: `185.421 +/- 67.385`
+- `lambda_self=0.3`: `250.933 +/- 53.486`
+
+Signal columns:
+
+- `lambda_self=0.01`: `corr/tau_pred_error=0.363`, `pred_error/mean=0.119`
+- `lambda_self=0.03`: `corr/tau_pred_error=0.602`, `pred_error/mean=0.113`
+- `lambda_self=0.3`: `corr/tau_pred_error=-0.164`, `pred_error/mean=0.067`
+
+Decision:
+
+- Adopt `lambda_self=0.3` as the best setting by final return.
+
+Machine-readable sweep summary:
+
+- `docs/stage2_lambda_sweep_2026-02-16.csv`
+
+## Delay-Biased Time Reg Check (BEST lambda_self)
+
+Using `lambda_self=0.3`, we compared `learned` vs `selfmodel` under delay-biased time regularization:
+
+- Root: `runs/sweeps/stage2_delay_delaybiased_ls3e-1`
+- Overrides:
+  - `time_reg.lambda_mean=1e-3`
+  - `time_reg.lambda_var=1e-2`
+
+From `runs/sweeps/stage2_delay_delaybiased_ls3e-1/aggregate/condition_summary.csv`:
+
+- `learned_tau_delay10`: `232.915 +/- 99.640`
+- `learned_tau_delay10_selfmodel`: `294.247 +/- 105.984`
+
+Stage-2 signal at best setting:
+
+- `corr/tau_pred_error_mean`: `0.591 +/- 0.109`
+- `pred_error/mean_mean`: `0.090 +/- 0.015`
+- `loss/self_model_mean`: `0.011 +/- 0.004`
+
+Interpretation:
+
+- With delay-biased time regularization and tuned `lambda_self`, Stage-2 improves over Stage-1 learned delay baseline.
+- Final performance improves but AUC is lower (`171.216` vs `198.547`), so sample efficiency remains a tuning target.
 
 ## Figures
 
@@ -57,3 +96,11 @@ Then rerun `stage2_delay` and compare:
 - `runs/sweeps/stage2_delay_lm0_lv1e-2/aggregate/final_performance.png`
 - `docs/figures/fig_stage2_delay_learning_curves.png`
 - `docs/figures/fig_stage2_delay_final.png`
+- `runs/sweeps/stage2_delay_ls3e-1_lm0_lv1e-2/aggregate/learning_curves.png`
+- `runs/sweeps/stage2_delay_ls3e-1_lm0_lv1e-2/aggregate/final_performance.png`
+- `docs/figures/fig_stage2_delay_lambda_sweep_learning_curves.png`
+- `docs/figures/fig_stage2_delay_lambda_sweep_final.png`
+- `runs/sweeps/stage2_delay_delaybiased_ls3e-1/aggregate/learning_curves.png`
+- `runs/sweeps/stage2_delay_delaybiased_ls3e-1/aggregate/final_performance.png`
+- `docs/figures/fig_stage2_delay_delaybiased_best_learning_curves.png`
+- `docs/figures/fig_stage2_delay_delaybiased_best_final.png`

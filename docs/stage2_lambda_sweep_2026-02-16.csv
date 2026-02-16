@@ -1,0 +1,5 @@
+setting,root,condition,final_mean,final_std,auc_mean,auc_std,corr_tau_pred_error_mean,pred_error_mean_mean,loss_self_model_mean
+lambda_self_0.1,runs/sweeps/stage2_delay_lm0_lv1e-2,learned_tau_delay10_selfmodel,163.119,20.858,158.119,27.703,0.579,0.070,0.011
+lambda_self_0.01,runs/sweeps/stage2_delay_ls1e-2_lm0_lv1e-2,learned_tau_delay10_selfmodel,201.725,75.494,174.605,43.874,0.363,0.119,0.025
+lambda_self_0.03,runs/sweeps/stage2_delay_ls3e-2_lm0_lv1e-2,learned_tau_delay10_selfmodel,185.421,67.385,172.569,48.176,0.602,0.113,0.023
+lambda_self_0.3,runs/sweeps/stage2_delay_ls3e-1_lm0_lv1e-2,learned_tau_delay10_selfmodel,250.933,53.486,177.562,24.490,-0.164,0.067,0.007
