@@ -76,19 +76,19 @@ Using `lambda_self=0.3`, we compared `learned` vs `selfmodel` under delay-biased
 
 From `runs/sweeps/stage2_delay_delaybiased_ls3e-1/aggregate/condition_summary.csv`:
 
-- `learned_tau_delay10`: `232.915 +/- 99.640`
-- `learned_tau_delay10_selfmodel`: `294.247 +/- 105.984`
+- `learned_tau_delay10`: `232.684 +/- 91.857`
+- `learned_tau_delay10_selfmodel`: `249.198 +/- 97.876`
 
 Stage-2 signal at best setting:
 
-- `corr/tau_pred_error_mean`: `0.591 +/- 0.109`
-- `pred_error/mean_mean`: `0.090 +/- 0.015`
-- `loss/self_model_mean`: `0.011 +/- 0.004`
+- `corr/tau_pred_error_mean`: `0.641 +/- 0.120`
+- `pred_error/mean_mean`: `0.084 +/- 0.019`
+- `loss/self_model_mean`: `0.010 +/- 0.004`
 
 Interpretation:
 
 - With delay-biased time regularization and tuned `lambda_self`, Stage-2 improves over Stage-1 learned delay baseline.
-- Final performance improves but AUC is lower (`171.216` vs `198.547`), so sample efficiency remains a tuning target.
+- Final performance improves but AUC is lower (`164.620` vs `179.250`), so sample efficiency remains a tuning target.
 
 ## Ablation: pred_error -> tau OFF (One-Bit)
 
@@ -110,21 +110,21 @@ Run:
 
 From `runs/sweeps/stage2_delay_delaybiased_ls3e-1/aggregate/condition_summary.csv`:
 
-- `learned_tau_delay10`: final `232.915 +/- 99.640`, AUC `198.547 +/- 34.286`
-- `learned_tau_delay10_selfmodel`: final `294.247 +/- 105.984`, AUC `171.216 +/- 27.657`
-- `learned_tau_delay10_selfmodel_noerr`: final `184.063 +/- 57.756`, AUC `175.358 +/- 46.799`
+- `learned_tau_delay10`: final `232.684 +/- 91.857`, AUC `179.250 +/- 33.388`
+- `learned_tau_delay10_selfmodel`: final `249.198 +/- 97.876`, AUC `164.620 +/- 34.611`
+- `learned_tau_delay10_selfmodel_noerr`: final `175.754 +/- 58.281`, AUC `153.155 +/- 43.081`
 
 Signal columns:
 
-- `learned_tau_delay10_selfmodel`: `corr/tau_pred_error=0.591 +/- 0.109`
-- `learned_tau_delay10_selfmodel_noerr`: `corr/tau_pred_error=0.686 +/- 0.081`
+- `learned_tau_delay10_selfmodel`: `corr/tau_pred_error=0.641 +/- 0.120`
+- `learned_tau_delay10_selfmodel_noerr`: `corr/tau_pred_error=0.700 +/- 0.101`
 
 Interpretation:
 
-- Turning OFF the `pred_error -> tau` pathway removes the Stage-2 gain (`294.247 -> 184.063`).
+- Turning OFF the `pred_error -> tau` pathway reduces final performance (`249.198 -> 175.754`).
 - With self-model training still enabled, performance drops below the learned Stage-1 delay baseline in this setting.
 - `corr/tau_pred_error` can stay non-zero as an observational correlation from shared latent dynamics; the intervention result above is the causal evidence.
-- This supports the causal claim that Stage-2 improvement in delay-biased setup comes from using prediction error to modulate internal time.
+- This remains directionally consistent with the causal claim that Stage-2 improvement is carried by prediction-error-based time modulation.
 
 ## Paired Effects (Seed-Matched, No Re-Training)
 
@@ -142,16 +142,16 @@ Artifacts:
 Main paired results (`delta = selfmodel - comparator`, bootstrap 95% CI):
 
 - vs `learned_tau_delay10`:
-  - `final_mean`: `+61.332` (CI `[-80.034, 225.111]`)
-  - `AUC`: `-27.331` (CI `[-40.266, -13.174]`)
+  - `final_mean`: `+16.513` (CI `[-75.805, 120.497]`)
+  - `AUC`: `-14.630` (CI `[-34.366, 7.844]`)
 - vs `learned_tau_delay10_selfmodel_noerr`:
-  - `final_mean`: `+110.184` (CI `[16.749, 245.697]`)
-  - `AUC`: `-4.142` (CI `[-37.358, 23.977]`)
+  - `final_mean`: `+73.443` (CI `[-0.228, 158.792]`)
+  - `AUC`: `+11.465` (CI `[-15.534, 39.798]`)
 
 Interpretation:
 
-- Final-score lift vs `noerr` remains robust under seed-matched pairing.
-- Sample-efficiency cost (AUC) remains the main downside at this setting.
+- Direction remains favorable for `selfmodel` on final score, but CIs are still close to/over zero at 10 seeds.
+- AUC differences are unstable across comparators, so sample-efficiency claims are not yet fixed.
 
 ## Delay-Length Sweep (0 / 5 / 10 / 20)
 
@@ -163,7 +163,7 @@ Protocol:
   - `time_reg.lambda_mean=1e-3`
   - `time_reg.lambda_var=1e-2`
   - `train.lambda_self=0.3`
-- Budget: 5 seeds, 200k per seed, per delay
+- Budget: 10 seeds, 200k per seed, per delay
 
 Summary artifacts:
 
@@ -174,23 +174,23 @@ Summary artifacts:
 
 Paired final deltas (`selfmodel - learned`):
 
-- `delay=0`: `-25.235` (CI `[-116.374, 61.516]`)
-- `delay=5`: `-24.417` (CI `[-107.039, 60.807]`)
-- `delay=10`: `+61.332` (CI `[-80.034, 225.111]`)
-- `delay=20`: `+23.571` (CI `[-43.211, 112.324]`)
+- `delay=0`: `-23.765` (CI `[-80.421, 28.852]`)
+- `delay=5`: `-6.342` (CI `[-64.759, 55.565]`)
+- `delay=10`: `+16.513` (CI `[-75.805, 120.497]`)
+- `delay=20`: `+24.762` (CI `[-19.969, 78.132]`)
 
 Paired AUC deltas (`selfmodel - learned`):
 
-- `delay=0`: `-18.116`
-- `delay=5`: `-4.831`
-- `delay=10`: `-27.331`
-- `delay=20`: `-35.889`
+- `delay=0`: `-6.594`
+- `delay=5`: `+5.239`
+- `delay=10`: `-14.630`
+- `delay=20`: `-20.454`
 
 Interpretation:
 
-- Improvement is delay-dependent but not monotonic in this budget.
-- The strongest positive point appears at `delay=10`; short delays (`0/5`) do not benefit.
-- Across all delays here, AUC tends to drop for self-model, so warmup/schedule remains the next low-cost optimization axis.
+- Direction is still delay-dependent but non-monotonic, and per-delay CIs still cross zero at this budget.
+- `delay=0/5` stay near zero or negative; `delay=10/20` are positive in mean but not yet conclusive.
+- Warmup/schedule is still the lowest-cost next step if we need stronger AUC and tighter separation.
 
 ## Figures
 
