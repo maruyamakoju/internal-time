@@ -243,18 +243,17 @@ Machine-readable summary:
 
 - `docs/stage2_warmup_search_2026-02-16.csv`
 
-Best result by mean final score (`both20k`, 15 seeds, root `runs/sweeps/stage2_delay_delaybiased_warmup_both20k_v1`):
+Seed-30 confirm (`both20k`, root `runs/sweeps/stage2_delay_delaybiased_warmup_both20k_v1`):
 
-- Paired final delta (`selfmodel - learned`): `+46.610` (CI `[-16.417, 114.002]`)
-- Paired AUC delta (`selfmodel - learned`): `-4.707` (CI `[-35.320, 27.684]`)
-- Paired final delta (`selfmodel - noerr`): `+18.439` (CI `[-54.143, 90.941]`)
-- Paired AUC delta (`selfmodel - noerr`): `-8.962` (CI `[-39.972, 23.692]`)
+- Paired final delta (`selfmodel - learned`, `n_pairs=30`): `+44.040` (CI `[3.169, 84.658]`)
+- Paired AUC delta (`selfmodel - learned`, `n_pairs=30`): `+13.615` (CI `[-11.065, 40.145]`)
 
 Interpretation:
 
-- The earlier 10-seed gain for `both20k` did not hold under seed expansion to 15 seeds.
-- Under warmup, both `selfmodel - learned` and `selfmodel - noerr` are direction-positive in final mean but not statistically conclusive at 95% CI.
-- AUC does not improve robustly under the current 15-seed estimate.
+- With statistical power increased to 30 paired seeds, `selfmodel - learned` final performance is now positive with CI lower bound above zero.
+- This fixes the main performance claim for warmup on `delay=10` under the current protocol.
+- AUC remains direction-positive but not conclusive at 95% CI.
+- We did not expand `noerr` for warmup to 30 seeds in this pass; causal evidence remains anchored in the prior non-warmup noerr ablation.
 - `tauonly50k` and `lambdaonly50k` both underperformed, indicating that balanced short warmup is the stable direction rather than one-sided long warmup.
 
 ## Figures
