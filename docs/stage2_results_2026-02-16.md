@@ -260,6 +260,41 @@ Interpretation:
 - Under warmup, `selfmodel - noerr` is direction-positive but not conclusive at 95% CI, so causal claims for warmup remain weaker than the non-warmup noerr ablation.
 - `tauonly50k` and `lambdaonly50k` both underperformed, indicating that balanced short warmup is the stable direction rather than one-sided long warmup.
 
+## Warmup Delay Sanity (0 vs 20, 5 Seeds)
+
+To check whether warmup gains are specific to `delay=10`, we ran a low-cost sanity sweep:
+
+- Root base: `runs/sweeps/stage2_delay_sweep_warmup_both20k_v1`
+- Warmup schedule: `pred_error_tau_warmup_timesteps=20000`, `lambda_self_warmup_timesteps=20000`
+- Time regularization: `time_reg.lambda_mean=1e-3`, `time_reg.lambda_var=1e-2`
+- Conditions: `learned_tau_delay10` vs `learned_tau_delay10_selfmodel`
+- Delays: `0`, `20`
+- Budget: 5 seeds per delay
+
+Artifacts:
+
+- `docs/stage2_delay_warmup_delay0_paired_2026-02-16.csv`
+- `docs/stage2_delay_warmup_delay20_paired_2026-02-16.csv`
+- `docs/stage2_delay_sweep_warmup_both20k_summary_2026-02-16.csv`
+- `docs/stage2_delay_sweep_warmup_both20k_summary_2026-02-16.tex`
+- `docs/figures/fig_stage2_delay_sweep_warmup_both20k_final.png`
+- `docs/figures/fig_stage2_delay_sweep_warmup_both20k_paired_delta.png`
+
+Paired final deltas (`selfmodel - learned`):
+
+- `delay=0`: `-8.213` (CI `[-60.208, 61.949]`)
+- `delay=20`: `+51.619` (CI `[-9.841, 101.251]`)
+
+Paired AUC deltas (`selfmodel - learned`):
+
+- `delay=0`: `-2.327` (CI `[-29.227, 33.718]`)
+- `delay=20`: `-19.399` (CI `[-78.412, 48.266]`)
+
+Interpretation:
+
+- Directionally, warmup remains consistent with low-delay non-gain (`delay=0`) and higher-delay positive final delta (`delay=20`).
+- At 5 seeds, both delay points still cross zero, so this is a sanity trend, not a significance claim.
+
 ## Figures
 
 - `runs/sweeps/stage2_delay_lm0_lv1e-2/aggregate/learning_curves.png`
@@ -286,3 +321,5 @@ Interpretation:
 - `runs/sweeps/stage2_delay_delaybiased_warmup_both20k_v1/aggregate/final_performance.png`
 - `docs/figures/fig_stage2_delay_warmup_both20k_learning_curves.png`
 - `docs/figures/fig_stage2_delay_warmup_both20k_final.png`
+- `docs/figures/fig_stage2_delay_sweep_warmup_both20k_final.png`
+- `docs/figures/fig_stage2_delay_sweep_warmup_both20k_paired_delta.png`

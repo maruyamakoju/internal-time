@@ -1,0 +1,11 @@
+anchor,comparator,metric,seed,anchor_value,comparator_value,delta
+learned_tau_delay10_selfmodel,learned_tau_delay10,auc,0,175.45182291666666,208.73828125,-33.28645833333334
+learned_tau_delay10_selfmodel,learned_tau_delay10,auc,1,160.79869791666667,96.23359375,64.56510416666667
+learned_tau_delay10_selfmodel,learned_tau_delay10,auc,2,150.16197916666667,178.62630208333334,-28.464322916666674
+learned_tau_delay10_selfmodel,learned_tau_delay10,auc,3,126.05572916666664,148.68828125000002,-22.63255208333338
+learned_tau_delay10_selfmodel,learned_tau_delay10,auc,4,176.9059895833333,168.72317708333335,8.182812499999955
+learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,0,257.17,335.475,-78.305
+learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,1,231.21000000000004,99.185,132.02500000000003
+learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,2,149.575,158.03,-8.455000000000013
+learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,3,146.47499999999997,204.145,-57.670000000000044
+learned_tau_delay10_selfmodel,learned_tau_delay10,final_mean,4,222.62,251.28000000000003,-28.660000000000025
