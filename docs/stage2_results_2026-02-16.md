@@ -264,17 +264,17 @@ Interpretation:
 - `noerr - learned` is also direction-positive but inconclusive, which suggests warmup can partially lift noerr and reduce separation between `selfmodel` and `noerr`.
 - `tauonly50k` and `lambdaonly50k` both underperformed, indicating that balanced short warmup is the stable direction rather than one-sided long warmup.
 
-## Warmup Delay Sanity (0 vs 20, Low-Cost)
+## Warmup Delay Sweep Refresh (0 / 10 / 20)
 
-To check whether warmup gains are specific to `delay=10`, we ran a low-cost sanity sweep:
+To place the strong `delay=10` result in the same sweep context, we refreshed warmup delay analysis:
 
-- Root base: `runs/sweeps/stage2_delay_sweep_warmup_both20k_v1`
+- Base root: `runs/sweeps/stage2_delay_sweep_warmup_both20k_v1`
+- Conditions: `learned_tau_delay10` vs `learned_tau_delay10_selfmodel`
 - Warmup schedule: `pred_error_tau_warmup_timesteps=20000`, `lambda_self_warmup_timesteps=20000`
 - Time regularization: `time_reg.lambda_mean=1e-3`, `time_reg.lambda_var=1e-2`
-- Conditions: `learned_tau_delay10` vs `learned_tau_delay10_selfmodel`
-- Delays: `0`, `20`
-- Budget:
-  - `delay=0`: 15 seeds
+- Delay budgets:
+  - `delay=0`: 30 seeds
+  - `delay=10`: 30 seeds (imported aggregate from `runs/sweeps/stage2_delay_delaybiased_warmup_both20k_v1`)
   - `delay=20`: 15 seeds
 
 Artifacts:
@@ -288,42 +288,44 @@ Artifacts:
 
 Paired final deltas (`selfmodel - learned`):
 
-- `delay=0`: `+3.911` (CI `[-44.501, 58.745]`)
-- `delay=20`: `+23.131` (CI `[-20.684, 64.190]`)
+- `delay=0` (`n=30`): `+16.910` (CI `[-34.583, 73.464]`)
+- `delay=10` (`n=30`): `+44.040` (CI `[3.169, 84.658]`)
+- `delay=20` (`n=15`): `+23.131` (CI `[-20.684, 64.190]`)
 
 Paired AUC deltas (`selfmodel - learned`):
 
-- `delay=0`: `+2.767` (CI `[-22.265, 32.796]`)
-- `delay=20`: `-14.311` (CI `[-44.870, 15.791]`)
+- `delay=0` (`n=30`): `+7.073` (CI `[-18.177, 34.160]`)
+- `delay=10` (`n=30`): `+13.615` (CI `[-11.065, 40.145]`)
+- `delay=20` (`n=15`): `-14.311` (CI `[-44.870, 15.791]`)
 
 Interpretation:
 
-- After balancing both delays to 15 seeds, both `delay=0` and `delay=20` final deltas still cross zero.
-- The direction remains positive at `delay=20`, but this stays a trend-level sanity result rather than a fixed significance claim.
+- The strongest and only fixed positive final-effect point remains `delay=10`.
+- `delay=0` and `delay=20` remain direction-positive in final mean but inconclusive at current confidence.
 
-## Warmup Delay Group Difference (0 vs 20, Seed-Matched)
+## Warmup Delay Group Difference (0 vs 10, Seed-Matched)
 
-We computed a seed-matched group contrast on warmup sweep deltas:
+We computed warmup group contrast with matched seeds:
 
 - Low-delay group: `delay={0}`
-- High-delay group: `delay={20}`
+- High-delay group: `delay={10}`
 - Delta definition: `selfmodel - learned`
 
 Artifacts:
 
-- `docs/stage2_delay_warmup_groupdiff_2026-02-16.csv`
-- `docs/stage2_delay_warmup_groupdiff_per_seed_2026-02-16.csv`
-- `docs/stage2_delay_warmup_groupdiff_2026-02-16.tex`
+- `docs/stage2_delay_warmup_groupdiff_0_vs_10_2026-02-16.csv`
+- `docs/stage2_delay_warmup_groupdiff_0_vs_10_per_seed_2026-02-16.csv`
+- `docs/stage2_delay_warmup_groupdiff_0_vs_10_2026-02-16.tex`
 
-Results (bootstrap 95% CI, intersection seeds across groups):
+Results (bootstrap 95% CI):
 
-- `final_mean`: group diff (`high - low`) = `+19.220` (CI `[-49.714, 85.881]`)
-- `AUC`: group diff (`high - low`) = `-17.078` (CI `[-52.259, 17.635]`)
+- `final_mean`: group diff (`10 - 0`) = `+27.130` (CI `[-42.314, 90.577]`)
+- `AUC`: group diff (`10 - 0`) = `+6.542` (CI `[-30.845, 44.310]`)
 
 Interpretation:
 
-- Group contrast is direction-positive in final score but not significant at 95% CI.
-- With both delays now at 15 seeds, current evidence supports a delay-dependence trend, not a fixed claim.
+- Directionally, `delay=10` remains stronger than `delay=0`, but group-level CI still crosses zero.
+- At this point, warmup delay dependence is best treated as a trend; fixed claim remains the per-delay `delay=10` result.
 
 ## Figures
 
