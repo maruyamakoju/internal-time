@@ -344,6 +344,41 @@ Reference group contrasts:
   - `docs/stage2_delay_warmup_groupdiff_0_vs_10_2026-02-16.csv`
   - `docs/stage2_delay_warmup_groupdiff_0_vs_20_2026-02-16.csv`
 
+## Robustness Check (Flicker = 0.1, Warmup both20k, delay=10)
+
+To test whether the fixed `delay=10` warmup gain survives observation corruption, we ran:
+
+- Root: `runs/sweeps/stage2_delay_delaybiased_warmup_both20k_flicker01_v1`
+- Conditions: `learned_tau_delay10` vs `learned_tau_delay10_selfmodel`
+- Budget: `5` seeds, `200k` timesteps/seed
+- Overrides:
+  - `env.reward_delay=10`
+  - `env.flicker_prob=0.1`
+  - `time_reg.lambda_mean=1e-3`
+  - `time_reg.lambda_var=1e-2`
+  - `train.lambda_self=0.3`
+  - `train.pred_error_tau_warmup_timesteps=20000`
+  - `train.lambda_self_warmup_timesteps=20000`
+
+Artifacts:
+
+- `docs/stage2_delay_warmup_flicker01_paired_2026-02-16.csv`
+- `docs/stage2_delay_warmup_flicker01_paired_seeds_2026-02-16.csv`
+- `docs/stage2_delay_warmup_flicker01_paired_2026-02-16.tex`
+- `docs/figures/fig_stage2_delay_warmup_flicker01_learning_curves.png`
+- `docs/figures/fig_stage2_delay_warmup_flicker01_final.png`
+
+Paired deltas (`selfmodel - learned`):
+
+- `final_mean` (`n=5`): `-45.002` (CI `[-115.582, 23.081]`)
+- `AUC` (`n=5`): `-21.048` (CI `[-36.080, -6.538]`)
+
+Interpretation:
+
+- Under `flicker_prob=0.1`, the warmup `delay=10` advantage does not hold at this budget.
+- Final-score delta is inconclusive and direction-negative in mean; AUC is significantly negative.
+- For release claims, keep the fixed result scoped to the non-flicker `delay=10` setting; treat flicker robustness as a current limitation.
+
 ## Figures
 
 - `runs/sweeps/stage2_delay_lm0_lv1e-2/aggregate/learning_curves.png`
