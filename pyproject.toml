@@ -3,19 +3,41 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "internal-time-rl"
-version = "0.1.0"
-description = "Internal time adaptive temporal reparameterization for RL agents"
+name = "internal-time"
+version = "0.3.0"
+description = "Temporal anomaly detection via learned internal time — adaptive temporal reparameterization"
+license = {text = "MIT"}
 requires-python = ">=3.11"
+readme = "README.md"
+keywords = ["anomaly-detection", "time-series", "pytorch", "temporal", "self-supervised"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
   "numpy>=1.26",
   "torch>=2.1",
+  "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+benchmark = [
+  "pandas>=2.1",
+]
+rl = [
   "gymnasium>=0.29",
   "hydra-core>=1.3",
   "omegaconf>=2.3",
   "pandas>=2.1",
-  "matplotlib>=3.8",
   "tqdm>=4.66",
+]
+dev = [
+  "pytest>=7.0",
 ]
 
 [tool.setuptools]
@@ -23,5 +45,4 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["internal_time_rl*"]
-
+include = ["internal_time*"]

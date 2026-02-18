@@ -1,0 +1,2 @@
+category,n_files,pa_f1_mean,pa_f1_std,pa_precision_mean,pa_recall_mean
+artificialWithAnomaly,3,0.661,0.572,0.655,0.667

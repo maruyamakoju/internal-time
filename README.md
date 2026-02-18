@@ -1,87 +1,126 @@
-# Learning Internal Time RL
+# internal-time
 
-`Adaptive Temporal Reparameterization` を強化学習エージェントへ実装するための研究用コードベースです。
+**Temporal anomaly detection via learned internal time.**
 
-## 実装済みの中核
+An AI agent learns its own internal clock. When something unexpected happens, the clock reacts — giving you a natural anomaly signal that captures *temporal surprise*, not just static outliers.
 
-- `internal_time_rl/models/time_module.py`
-  - 学習可能な内部時間 `Δτ_t = g(h_t, x_t)`（`softplus` で正値制約）
-  - 時間正則化（平均・分散・エネルギー）
-  - オプションの KL 制約（対数時間をガウス事前分布へ）
-- `internal_time_rl/models/policy.py`
-  - `transition_mode = standard / fixed / learned`
-  - `standard`: `h_{t+1} = GRU(x_t, h_t)`（time-scalingなし）
-  - `fixed|learned`: `h_{t+1} = (1 - α_t) h_t + α_t \tilde{h}_{t+1}`, `α_t = 1 - exp(-Δτ_t)`
-  - 離散/連続 action space に対応
-- `internal_time_rl/algorithms/ppo_time.py`
-  - PPO + GAE
-  - 内部時間正則化を PPO 損失へ統合
-  - `discount_mode = fixed / env_dt / internal_tau`
-  - `corr(Δτ, |Adv|)`, `corr(Δτ, |TD error|)`, `corr(Δτ, action_repeat)` をログ出力
-- `internal_time_rl/envs/wrappers.py`
-  - Delayed Reward
-  - Flickering Observation
-  - Variable Speed (action repeat)
-- `analysis/plot_internal_time.py`
-  - 学習ログから `Δτ` の推移を可視化
-
-## セットアップ
+## Quick Start
 
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
 pip install -e .
 ```
 
-## 学習実行
+```python
+from internal_time import TemporalAnomalyDetector
 
-```bash
-python train.py
+detector = TemporalAnomalyDetector(input_dim=3)
+detector.fit(normal_data)           # train on normal time series
+scores = detector.score(test_data)  # anomaly scores per timestep
 ```
 
-注意:
-- `train.total_timesteps >= train.num_envs * train.rollout_steps` にしてください（0 update回避）。
+## NAB Benchmark Results
 
-Hydra でオーバーライド可能:
+Evaluated on all 52 labeled files from the [Numenta Anomaly Benchmark](https://github.com/numenta/NAB) (point-adjusted F1):
 
-```bash
-python train.py env.id=Pendulum-v1 train.total_timesteps=300000 env.reward_delay=10
-python train.py env.id=CartPole-v1 env.flicker_prob=0.35
-python train.py env.id=Pendulum-v1 env.variable_speed=true env.min_repeat=1 env.max_repeat=5
-python train.py model.transition_mode=standard
-python train.py model.transition_mode=fixed model.fixed_tau=10.0
-python train.py model.transition_mode=learned
-python train.py env.variable_speed=true env.min_repeat=1 env.max_repeat=4 train.discount_mode=env_dt
+| Category | Files | pa-F1 (mean) | pa-Precision | pa-Recall |
+|---|---|---|---|---|
+| artificialWithAnomaly | 6 | **0.936** | 0.886 | 1.000 |
+| realTweets | 10 | **0.926** | 0.887 | 0.972 |
+| realTraffic | 7 | **0.893** | 0.849 | 0.964 |
+| realKnownCause | 7 | **0.846** | 0.891 | 0.857 |
+| realAWSCloudwatch | 16 | 0.689 | 0.678 | 0.781 |
+| realAdExchange | 6 | 0.375 | 0.446 | 0.417 |
+| **Overall** | **52** | **0.775** | **0.767** | **0.836** |
+
+Highlights: nyc_taxi 0.932, Twitter volume 0.926 avg, traffic 0.893 avg.
+
+## How It Works
+
+A GRU processes the time series step by step. At each step:
+
+1. A **self-model** predicts the next hidden state from the current one
+2. The **prediction error** measures how surprising the actual transition was
+3. An **internal time head** outputs `delta_tau` — how fast the agent's internal clock should tick
+4. The hidden state is mixed: `h_next = (1-alpha) * h_prev + alpha * h_candidate`
+
+After training on normal data, the prediction error and delta_tau naturally spike at anomalous transitions — the model has learned what "normal temporal dynamics" look like, and anything else triggers surprise.
+
+## Streaming Mode
+
+Process data one observation at a time for real-time monitoring:
+
+```python
+scorer = detector.create_streaming_scorer(threshold=2.0)
+
+for obs in live_data_stream:
+    result = scorer.step(obs)
+    if result["is_anomaly"]:
+        alert(f"Anomaly detected! score={result['score']:.2f}")
 ```
 
-## ログ解析
+## Core Module (for integration)
 
-```bash
-python -m internal_time_rl.analysis.plot_internal_time --csv runs/latest/metrics.csv --out runs/latest/internal_time.png
-python -m internal_time_rl.analysis.aggregate_runs --root runs/sweeps/stage1 --metric episode/return_mean_20
-python -m internal_time_rl.analysis.export_stage2_main_table
-python -m internal_time_rl.analysis.release_stage2 reproduce
-python -m internal_time_rl.analysis.release_stage2 verify
-# n_pairs不足時に失敗させるガード
-python -m internal_time_rl.analysis.paired_effects --input runs/sweeps/stage2_delay/aggregate/per_run_summary.csv --anchor learned_tau_delay10_selfmodel --comparators learned_tau_delay10 --min-n-pairs 30 --out-csv runs/sweeps/stage2_delay/aggregate/paired.csv
+Use `TemporalGRUCell` directly in any PyTorch pipeline:
+
+```python
+from internal_time import TemporalGRUCell
+
+cell = TemporalGRUCell(input_dim=10, hidden_dim=64, use_self_model=True)
+h = cell.init_hidden(batch_size=32)
+
+for t in range(seq_len):
+    h, info = cell(x[:, t, :], h)
+    # info.delta_tau  — internal time step
+    # info.pred_error — self-model prediction error
 ```
 
-## 追加スクリプト
+Or process a full sequence:
 
-- `scripts/smoke_test.cmd`: 短時間の起動確認
-- `scripts/run_ablation.cmd`: `standard/fixed(1,3,10)/learned` の単発比較
-- `scripts/run_sweep.py`: `condition x seed` の一括実行（論文向け）
-- `scripts/run_sweep.cmd`: `stage1_full x 5 seeds` 実行
-- `scripts/aggregate_runs.cmd`: multi-seed 集計と図生成
-- `scripts/reproduce_stage2_release_v1.cmd`: Stage-2 release成果物を再生成（既存runを再解析）
-- `scripts/verify_stage2_release_v1.cmd`: Stage-2 release主張ガード（Fixed/Trend/Limitation）を検証
-- `internal_time_rl/analysis/export_stage2_main_table.py`: Stage-2主結果テーブル（CSV/TeX）を既存CSVから生成
-- `internal_time_rl/analysis/release_stage2.py`: Stage-2 release用の reproduce/verify オーケストレーション
-- `docs/stage1_protocol.md`: Stage-1 論文化用プロトコル
-- `docs/research_plan.md`: 数理拡張を含む研究計画メモ
+```python
+out = cell.forward_sequence(x_seq)  # (batch, seq_len, input_dim)
+# out.delta_taus — (batch, seq_len)
+# out.pred_errors — (batch, seq_len)
+# out.self_model_loss — scalar, for training
+```
 
-## 推奨ロードマップ
+## Examples
 
-1. Phase-1: Baseline PPO と Internal-Time PPO の比較（遅延報酬・POMDP・可変速度）
-2. Phase-2: `Self Model` を導入して `Δτ_t = g(h_t, x_t, \hat{h}_{t+1})` へ拡張
-3. 理論: 収束性/安定性の補題をタスク条件ごとに整理
+```bash
+python examples/01_core_basics.py       # TemporalGRUCell usage
+python examples/02_anomaly_synthetic.py  # Synthetic anomaly detection
+python examples/03_streaming_demo.py     # Real-time streaming mode
+```
+
+## NAB Benchmark
+
+```bash
+python -m internal_time.benchmark --data-root data/nab --out results/nab --device cuda
+```
+
+## Package Structure
+
+```
+internal_time/          # Product package
+  core.py               # TemporalGRUCell, InternalTimeHead, SelfModel
+  anomaly.py            # TemporalAnomalyDetector, StreamingScorer
+  viz.py                # Visualization utilities
+  benchmark.py          # NAB evaluation
+
+internal_time_rl/       # Research package (RL experiments)
+  models/               # Policy, time module, encoder
+  algorithms/           # PPO + internal time
+  envs/                 # Gymnasium wrappers
+  analysis/             # Experiment analysis tools
+```
+
+## Requirements
+
+- Python >= 3.11
+- PyTorch >= 2.1
+- NumPy >= 1.26
+- matplotlib >= 3.8 (for visualization)
+- pandas (for benchmark)
+
+## Research Background
+
+This project originated from research on adaptive temporal reparameterization for RL agents. The core insight — that a learned internal clock produces useful temporal surprise signals — turned out to be directly applicable to anomaly detection without requiring RL rewards at all. See `docs/research_plan.md` for the research context.

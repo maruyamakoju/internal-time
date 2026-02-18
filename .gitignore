@@ -1,10 +1,25 @@
-.venv/
+# Python
 __pycache__/
-*.pyc
-*.pyo
-.pytest_cache/
-runs/
-outputs/
-*.pt
-*.png
-!docs/figures/fig_*.png
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Data (large, download separately)
+data/
+
+# IDE / tools
+.claude/
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
