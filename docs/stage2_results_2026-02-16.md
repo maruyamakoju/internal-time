@@ -275,7 +275,7 @@ To place the strong `delay=10` result in the same sweep context, we refreshed wa
 - Delay budgets:
   - `delay=0`: 30 seeds
   - `delay=10`: 30 seeds (imported aggregate from `runs/sweeps/stage2_delay_delaybiased_warmup_both20k_v1`)
-  - `delay=20`: 15 seeds
+  - `delay=20`: 30 seeds
 
 Artifacts:
 
@@ -290,42 +290,50 @@ Paired final deltas (`selfmodel - learned`):
 
 - `delay=0` (`n=30`): `+16.910` (CI `[-34.583, 73.464]`)
 - `delay=10` (`n=30`): `+44.040` (CI `[3.169, 84.658]`)
-- `delay=20` (`n=15`): `+23.131` (CI `[-20.684, 64.190]`)
+- `delay=20` (`n=30`): `+14.472` (CI `[-10.750, 39.046]`)
 
 Paired AUC deltas (`selfmodel - learned`):
 
 - `delay=0` (`n=30`): `+7.073` (CI `[-18.177, 34.160]`)
 - `delay=10` (`n=30`): `+13.615` (CI `[-11.065, 40.145]`)
-- `delay=20` (`n=15`): `-14.311` (CI `[-44.870, 15.791]`)
+- `delay=20` (`n=30`): `-9.176` (CI `[-26.908, 7.256]`)
 
 Interpretation:
 
 - The strongest and only fixed positive final-effect point remains `delay=10`.
-- `delay=0` and `delay=20` remain direction-positive in final mean but inconclusive at current confidence.
+- `delay=0` and `delay=20` remain inconclusive at current confidence.
 
-## Warmup Delay Group Difference (0 vs 10, Seed-Matched)
+## Warmup Delay Group Difference (Primary: {10,20} vs 0)
 
 We computed warmup group contrast with matched seeds:
 
 - Low-delay group: `delay={0}`
-- High-delay group: `delay={10}`
+- High-delay group: `delay={10,20}`
 - Delta definition: `selfmodel - learned`
 
 Artifacts:
 
-- `docs/stage2_delay_warmup_groupdiff_0_vs_10_2026-02-16.csv`
-- `docs/stage2_delay_warmup_groupdiff_0_vs_10_per_seed_2026-02-16.csv`
-- `docs/stage2_delay_warmup_groupdiff_0_vs_10_2026-02-16.tex`
+- `docs/stage2_delay_warmup_groupdiff_0_vs_10_20_2026-02-16.csv`
+- `docs/stage2_delay_warmup_groupdiff_0_vs_10_20_per_seed_2026-02-16.csv`
+- `docs/stage2_delay_warmup_groupdiff_0_vs_10_20_2026-02-16.tex`
 
 Results (bootstrap 95% CI):
 
-- `final_mean`: group diff (`10 - 0`) = `+27.130` (CI `[-42.314, 90.577]`)
-- `AUC`: group diff (`10 - 0`) = `+6.542` (CI `[-30.845, 44.310]`)
+- `final_mean`: group diff (`{10,20} - 0`) = `+12.346` (CI `[-50.539, 70.687]`)
+- `AUC`: group diff (`{10,20} - 0`) = `-4.853` (CI `[-36.271, 25.431]`)
 
 Interpretation:
 
-- Directionally, `delay=10` remains stronger than `delay=0`, but group-level CI still crosses zero.
-- At this point, warmup delay dependence is best treated as a trend; fixed claim remains the per-delay `delay=10` result.
+- Even after balancing `delay=20` to 30 seeds and averaging high-delay points, group-level CI still crosses zero.
+- Warmup delay dependence remains a trend-level observation; fixed claim remains the per-delay `delay=10` result.
+
+Reference group contrasts:
+
+- `10 - 0` final: `+27.130` (CI `[-42.314, 90.577]`), AUC: `+6.542` (CI `[-30.845, 44.310]`)
+- `20 - 0` final: `-2.439` (CI `[-62.867, 56.197]`), AUC: `-16.249` (CI `[-46.497, 12.539]`)
+- Artifacts:
+  - `docs/stage2_delay_warmup_groupdiff_0_vs_10_2026-02-16.csv`
+  - `docs/stage2_delay_warmup_groupdiff_0_vs_20_2026-02-16.csv`
 
 ## Figures
 
