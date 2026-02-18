@@ -2,6 +2,12 @@
 
 This file records Stage-2 delay experiments after Stage-1 freeze (`stage1_defense_v2`).
 
+## Release Summary (Fixed / Trend / Limitation)
+
+- **Fixed:** non-flicker `delay=10` + warmup(both20k) gives `selfmodel - learned` **final > 0** with **CI95 low > 0** (`n_pairs=30`).
+- **Trend:** warmup delay dependence by group contrast **`{10,20} - 0`** is **not significant** even with `n=30` (CI crosses zero).
+- **Limitation:** with `env.flicker_prob=0.1`, warmup `delay=10` **does not hold** at `n=5`; **AUC is significantly negative**.
+
 ## Protocol
 
 - Suite: `stage2_delay`
@@ -224,10 +230,6 @@ Interpretation:
 - Additional power, or a lower-variance training schedule (warmup), is required for a hard significance claim on delay-group contrast.
 
 ## Warmup Search (Performance-Focused)
-
-Fixed: warmup(both20k) at delay=10 gives selfmodel - learned final > 0 with 95% CI lower bound > 0 (n=30).
-
-Trend: warmup delay dependence is not significant by group contrast ({10,20} - 0) even with n=30; treat as trend only.
 
 Main-table artifacts:
 
