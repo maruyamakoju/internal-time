@@ -6,6 +6,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from internal_time_rl.analysis.common import (
+    bootstrap_ci_mean,
+    ensure_columns,
+    save_tex_with_numeric_format,
+)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -42,20 +48,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def bootstrap_ci_mean(values: np.ndarray, samples: int, seed: int) -> tuple[float, float]:
-    arr = np.asarray(values, dtype=np.float64).reshape(-1)
-    n = arr.size
-    if n == 0:
-        return float("nan"), float("nan")
-    if n == 1:
-        v = float(arr[0])
-        return v, v
-    rng = np.random.default_rng(seed)
-    idx = rng.integers(0, n, size=(samples, n))
-    means = arr[idx].mean(axis=1)
-    return float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))
-
-
 def load_delay_delta_table(
     base_root: Path,
     delays: list[int],
@@ -69,10 +61,11 @@ def load_delay_delta_table(
         if not per_run_path.exists():
             raise FileNotFoundError(f"Missing file: {per_run_path}")
         per_df = pd.read_csv(per_run_path)
-        required = {"condition", "seed", metric}
-        missing = [c for c in required if c not in per_df.columns]
-        if missing:
-            raise ValueError(f"{per_run_path} missing columns: {missing}")
+        ensure_columns(
+            per_df,
+            {"condition", "seed", metric},
+            context=str(per_run_path),
+        )
 
         base = per_df[per_df["condition"] == baseline_condition][["seed", metric]].rename(
             columns={metric: "baseline"}
@@ -180,25 +173,14 @@ def main() -> None:
         print(f"Saved: {out_per_seed}")
 
     if args.out_tex:
-        out_tex = Path(args.out_tex)
-        out_tex.parent.mkdir(parents=True, exist_ok=True)
-        tex_df = summary_df.copy()
-        numeric_cols = [
-            "low_delta_mean",
-            "low_delta_std",
-            "high_delta_mean",
-            "high_delta_std",
-            "group_diff_mean",
-            "group_diff_std",
-            "group_diff_ci95_low",
-            "group_diff_ci95_high",
-        ]
-        for col in numeric_cols:
-            tex_df[col] = tex_df[col].map(lambda x: f"{x:.3f}")
-        tex_df.to_latex(out_tex, index=False, escape=False)
+        out_tex = save_tex_with_numeric_format(
+            summary_df,
+            args.out_tex,
+            non_numeric_cols=["metric", "low_delays", "high_delays"],
+            digits=3,
+        )
         print(f"Saved: {out_tex}")
 
 
 if __name__ == "__main__":
     main()
-

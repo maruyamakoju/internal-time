@@ -6,6 +6,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from internal_time_rl.analysis.common import (
+    bootstrap_ci_mean,
+    ensure_columns,
+    require_path,
+    save_tex_with_numeric_format,
+)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -82,41 +89,30 @@ def parse_args() -> argparse.Namespace:
             "(comparator, metric). Raises an error if unmet."
         ),
     )
+    parser.add_argument(
+        "--require-input-newer-than",
+        type=str,
+        default=None,
+        help=(
+            "Optional path that must be older than --input. "
+            "Useful to prevent stale paired analysis."
+        ),
+    )
     return parser.parse_args()
-
-
-def bootstrap_ci_mean(
-    values: np.ndarray,
-    samples: int,
-    seed: int,
-    ci_low: float = 2.5,
-    ci_high: float = 97.5,
-) -> tuple[float, float]:
-    arr = np.asarray(values, dtype=np.float64).reshape(-1)
-    n = arr.size
-    if n == 0:
-        return float("nan"), float("nan")
-    if n == 1:
-        v = float(arr[0])
-        return v, v
-
-    rng = np.random.default_rng(seed)
-    idx = rng.integers(0, n, size=(samples, n))
-    means = arr[idx].mean(axis=1)
-    return float(np.percentile(means, ci_low)), float(np.percentile(means, ci_high))
-
-
-def ensure_columns(df: pd.DataFrame, cols: list[str]) -> None:
-    missing = [c for c in cols if c not in df.columns]
-    if missing:
-        raise ValueError(f"Missing columns in input: {missing}")
 
 
 def main() -> None:
     args = parse_args()
-    in_path = Path(args.input)
+    in_path = require_path(args.input, kind="file")
+    if args.require_input_newer_than:
+        ref_path = require_path(args.require_input_newer_than, kind="file")
+        if in_path.stat().st_mtime < ref_path.stat().st_mtime:
+            raise SystemExit(
+                f"Input appears stale: {in_path} is older than {ref_path}. "
+                "Run aggregate first or update --input."
+            )
     df = pd.read_csv(in_path)
-    ensure_columns(df, ["condition", args.join_key, *args.metrics])
+    ensure_columns(df, ["condition", args.join_key, *args.metrics], context=str(in_path))
 
     anchor_df = df[df["condition"] == args.anchor][[args.join_key, *args.metrics]].copy()
     if anchor_df.empty:
@@ -201,7 +197,7 @@ def main() -> None:
                         "anchor": args.anchor,
                         "comparator": comp,
                         "metric": metric,
-                        args.join_key: int(m_row[args.join_key]),
+                        args.join_key: m_row[args.join_key],
                         "anchor_value": float(anchor_val),
                         "comparator_value": float(comp_val),
                         "delta": float(anchor_val - comp_val),
@@ -240,15 +236,12 @@ def main() -> None:
         print(f"Saved: {out_per_seed}")
 
     if args.out_tex:
-        out_tex = Path(args.out_tex)
-        out_tex.parent.mkdir(parents=True, exist_ok=True)
-        summary_fmt = summary_df.copy()
-        for col in ["delta_mean", "delta_std", "ci95_low", "ci95_high", "delta_min", "delta_max"]:
-            if col in summary_fmt.columns:
-                summary_fmt[col] = summary_fmt[col].map(
-                    lambda x: f"{x:.3f}" if pd.notna(x) else "nan"
-                )
-        summary_fmt.to_latex(out_tex, index=False, escape=False)
+        out_tex = save_tex_with_numeric_format(
+            summary_df,
+            args.out_tex,
+            non_numeric_cols=["anchor", "comparator", "metric"],
+            digits=3,
+        )
         print(f"Saved: {out_tex}")
 
 

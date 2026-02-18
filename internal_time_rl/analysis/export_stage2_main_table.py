@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from internal_time_rl.analysis.common import require_path, save_tex_with_numeric_format
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -41,13 +43,6 @@ def parse_args() -> argparse.Namespace:
         help="Output TeX path.",
     )
     return parser.parse_args()
-
-
-def require_path(path_str: str) -> Path:
-    path = Path(path_str)
-    if not path.exists():
-        raise SystemExit(f"Missing input file: {path}")
-    return path
 
 
 def classify(delta_mean: float, ci_low: float, ci_high: float) -> str:
@@ -172,15 +167,14 @@ def main() -> None:
     out_df.to_csv(out_csv, index=False)
     print(f"Saved: {out_csv}")
 
-    out_tex = Path(args.out_tex)
-    out_tex.parent.mkdir(parents=True, exist_ok=True)
-    tex_df = out_df.copy()
-    for col in ("delta_mean", "ci95_low", "ci95_high"):
-        tex_df[col] = tex_df[col].map(lambda x: f"{x:.3f}")
-    tex_df.to_latex(out_tex, index=False, escape=False)
+    out_tex = save_tex_with_numeric_format(
+        out_df,
+        args.out_tex,
+        non_numeric_cols=["claim", "metric", "status", "source"],
+        digits=3,
+    )
     print(f"Saved: {out_tex}")
 
 
 if __name__ == "__main__":
     main()
-

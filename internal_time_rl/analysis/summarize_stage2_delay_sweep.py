@@ -6,6 +6,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from internal_time_rl.analysis.common import (
+    bootstrap_ci_mean,
+    ensure_columns,
+    save_tex_with_numeric_format,
+)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -53,20 +59,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def bootstrap_ci_mean(values: np.ndarray, samples: int, seed: int) -> tuple[float, float]:
-    arr = np.asarray(values, dtype=np.float64).reshape(-1)
-    n = arr.size
-    if n == 0:
-        return float("nan"), float("nan")
-    if n == 1:
-        v = float(arr[0])
-        return v, v
-    rng = np.random.default_rng(seed)
-    idx = rng.integers(0, n, size=(samples, n))
-    means = arr[idx].mean(axis=1)
-    return float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))
-
-
 def pick_condition_row(df: pd.DataFrame, condition: str) -> pd.Series:
     sub = df[df["condition"] == condition]
     if sub.empty:
@@ -83,9 +75,11 @@ def paired_delta(
     bootstrap_seed: int,
 ) -> dict[str, float | int]:
     need_cols = {"condition", "seed", metric}
-    missing = [c for c in need_cols if c not in per_run_df.columns]
-    if missing:
-        raise ValueError(f"per_run_summary is missing columns: {missing}")
+    ensure_columns(
+        per_run_df,
+        need_cols,
+        context="per_run_summary",
+    )
 
     base = per_run_df[per_run_df["condition"] == baseline_condition][["seed", metric]].rename(
         columns={metric: "baseline"}
@@ -196,19 +190,14 @@ def main() -> None:
     print(f"Saved: {out_csv}")
 
     if args.out_tex:
-        out_tex = Path(args.out_tex)
-        out_tex.parent.mkdir(parents=True, exist_ok=True)
-        tex_df = out_df.copy()
-        for col in tex_df.columns:
-            if col in {"delay", "root", "baseline_condition", "selfmodel_condition"}:
-                continue
-            tex_df[col] = pd.to_numeric(tex_df[col], errors="coerce").map(
-                lambda x: f"{x:.3f}" if pd.notna(x) else "nan"
-            )
-        tex_df.to_latex(out_tex, index=False, escape=False)
+        out_tex = save_tex_with_numeric_format(
+            out_df,
+            args.out_tex,
+            non_numeric_cols=["delay", "root", "baseline_condition", "selfmodel_condition"],
+            digits=3,
+        )
         print(f"Saved: {out_tex}")
 
 
 if __name__ == "__main__":
     main()
-
