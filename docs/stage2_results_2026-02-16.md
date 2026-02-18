@@ -274,7 +274,7 @@ To check whether warmup gains are specific to `delay=10`, we ran a low-cost sani
 - Conditions: `learned_tau_delay10` vs `learned_tau_delay10_selfmodel`
 - Delays: `0`, `20`
 - Budget:
-  - `delay=0`: 5 seeds
+  - `delay=0`: 15 seeds
   - `delay=20`: 15 seeds
 
 Artifacts:
@@ -288,18 +288,18 @@ Artifacts:
 
 Paired final deltas (`selfmodel - learned`):
 
-- `delay=0`: `-8.213` (CI `[-60.208, 61.949]`)
+- `delay=0`: `+3.911` (CI `[-44.501, 58.745]`)
 - `delay=20`: `+23.131` (CI `[-20.684, 64.190]`)
 
 Paired AUC deltas (`selfmodel - learned`):
 
-- `delay=0`: `-2.327` (CI `[-29.227, 33.718]`)
+- `delay=0`: `+2.767` (CI `[-22.265, 32.796]`)
 - `delay=20`: `-14.311` (CI `[-44.870, 15.791]`)
 
 Interpretation:
 
-- Directionally, warmup remains consistent with low-delay non-gain (`delay=0`) and higher-delay positive final delta (`delay=20`).
-- `delay=20` remains direction-positive after adding seeds, but still crosses zero, so this is still a trend-level sanity result.
+- After balancing both delays to 15 seeds, both `delay=0` and `delay=20` final deltas still cross zero.
+- The direction remains positive at `delay=20`, but this stays a trend-level sanity result rather than a fixed significance claim.
 
 ## Warmup Delay Group Difference (0 vs 20, Seed-Matched)
 
@@ -317,13 +317,13 @@ Artifacts:
 
 Results (bootstrap 95% CI, intersection seeds across groups):
 
-- `final_mean`: group diff (`high - low`) = `+59.832` (CI `[8.201, 111.632]`)
-- `AUC`: group diff (`high - low`) = `-17.072` (CI `[-64.343, 31.859]`)
+- `final_mean`: group diff (`high - low`) = `+19.220` (CI `[-49.714, 85.881]`)
+- `AUC`: group diff (`high - low`) = `-17.078` (CI `[-52.259, 17.635]`)
 
 Interpretation:
 
-- Final-score group contrast is positive on the shared-seed subset, consistent with stronger gains at higher delay.
-- Because current group matching uses shared seeds (limited by `delay=0` seed count), this supports trend direction but not a full-budget claim yet.
+- Group contrast is direction-positive in final score but not significant at 95% CI.
+- With both delays now at 15 seeds, current evidence supports a delay-dependence trend, not a fixed claim.
 
 ## Figures
 
