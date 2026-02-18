@@ -1,0 +1,12 @@
+\begin{tabular}{llrlllll}
+\toprule
+claim & metric & n_obs & delta_mean & ci95_low & ci95_high & status & source \\
+\midrule
+warmup_delay10_selfmodel_minus_learned & final_mean & 30 & 44.040 & 3.169 & 84.658 & fixed_positive & docs\stage2_delay_warmup_both20k_paired_2026-02-16.csv \\
+warmup_delay10_selfmodel_minus_learned & auc & 30 & 13.615 & -11.065 & 40.145 & trend_positive & docs\stage2_delay_warmup_both20k_paired_2026-02-16.csv \\
+warmup_groupdiff_high_10_20_minus_low_0 & final_mean & 30 & 12.346 & -50.539 & 70.687 & trend_positive & docs\stage2_delay_warmup_groupdiff_0_vs_10_20_2026-02-16.csv \\
+warmup_groupdiff_high_10_20_minus_low_0 & auc & 30 & -4.853 & -36.271 & 25.431 & trend_negative & docs\stage2_delay_warmup_groupdiff_0_vs_10_20_2026-02-16.csv \\
+nonwarmup_causal_selfmodel_minus_noerr & final_mean & 15 & 62.102 & 7.224 & 124.360 & fixed_positive & docs\stage2_delay_paired_effects_2026-02-16.csv \\
+nonwarmup_causal_selfmodel_minus_noerr & auc & 15 & 10.099 & -10.801 & 31.636 & trend_positive & docs\stage2_delay_paired_effects_2026-02-16.csv \\
+\bottomrule
+\end{tabular}

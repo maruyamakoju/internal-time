@@ -59,6 +59,9 @@ python train.py env.variable_speed=true env.min_repeat=1 env.max_repeat=4 train.
 ```bash
 python -m internal_time_rl.analysis.plot_internal_time --csv runs/latest/metrics.csv --out runs/latest/internal_time.png
 python -m internal_time_rl.analysis.aggregate_runs --root runs/sweeps/stage1 --metric episode/return_mean_20
+python -m internal_time_rl.analysis.export_stage2_main_table
+# n_pairs不足時に失敗させるガード
+python -m internal_time_rl.analysis.paired_effects --input runs/sweeps/stage2_delay/aggregate/per_run_summary.csv --anchor learned_tau_delay10_selfmodel --comparators learned_tau_delay10 --min-n-pairs 30 --out-csv runs/sweeps/stage2_delay/aggregate/paired.csv
 ```
 
 ## 追加スクリプト
@@ -68,6 +71,7 @@ python -m internal_time_rl.analysis.aggregate_runs --root runs/sweeps/stage1 --m
 - `scripts/run_sweep.py`: `condition x seed` の一括実行（論文向け）
 - `scripts/run_sweep.cmd`: `stage1_full x 5 seeds` 実行
 - `scripts/aggregate_runs.cmd`: multi-seed 集計と図生成
+- `internal_time_rl/analysis/export_stage2_main_table.py`: Stage-2主結果テーブル（CSV/TeX）を既存CSVから生成
 - `docs/stage1_protocol.md`: Stage-1 論文化用プロトコル
 - `docs/research_plan.md`: 数理拡張を含む研究計画メモ
 

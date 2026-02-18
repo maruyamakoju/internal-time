@@ -1,0 +1,7 @@
+claim,metric,n_obs,delta_mean,ci95_low,ci95_high,status,source
+warmup_delay10_selfmodel_minus_learned,final_mean,30,44.04016666666666,3.1687999999999934,84.65789583333333,fixed_positive,docs\stage2_delay_warmup_both20k_paired_2026-02-16.csv
+warmup_delay10_selfmodel_minus_learned,auc,30,13.61542534722223,-11.06489431423612,40.144559678819455,trend_positive,docs\stage2_delay_warmup_both20k_paired_2026-02-16.csv
+warmup_groupdiff_high_10_20_minus_low_0,final_mean,30,12.34575,-50.53948541666667,70.68733958333334,trend_positive,docs\stage2_delay_warmup_groupdiff_0_vs_10_20_2026-02-16.csv
+warmup_groupdiff_high_10_20_minus_low_0,auc,30,-4.853428819444443,-36.27110123697916,25.431359700520822,trend_negative,docs\stage2_delay_warmup_groupdiff_0_vs_10_20_2026-02-16.csv
+nonwarmup_causal_selfmodel_minus_noerr,final_mean,15,62.102,7.223983333333334,124.35954166666666,fixed_positive,docs\stage2_delay_paired_effects_2026-02-16.csv
+nonwarmup_causal_selfmodel_minus_noerr,auc,15,10.099201388888892,-10.800805555555552,31.6356892361111,trend_positive,docs\stage2_delay_paired_effects_2026-02-16.csv

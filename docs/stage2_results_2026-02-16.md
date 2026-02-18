@@ -225,6 +225,15 @@ Interpretation:
 
 ## Warmup Search (Performance-Focused)
 
+Fixed: warmup(both20k) at delay=10 gives selfmodel - learned final > 0 with 95% CI lower bound > 0 (n=30).
+
+Trend: warmup delay dependence is not significant by group contrast ({10,20} - 0) even with n=30; treat as trend only.
+
+Main-table artifacts:
+
+- `docs/stage2_main_table_2026-02-16.csv`
+- `docs/stage2_main_table_2026-02-16.tex`
+
 We added two schedule controls:
 
 - `train.pred_error_tau_warmup_timesteps`

@@ -73,6 +73,15 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional LaTeX table output.",
     )
+    parser.add_argument(
+        "--min-n-pairs",
+        type=int,
+        default=None,
+        help=(
+            "Optional minimum required paired samples for every "
+            "(comparator, metric). Raises an error if unmet."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -202,6 +211,22 @@ def main() -> None:
     out_csv = Path(args.out_csv)
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     summary_df = pd.DataFrame(summary_rows)
+
+    if args.min_n_pairs is not None:
+        min_pairs = int(args.min_n_pairs)
+        missing = summary_df[summary_df["n_pairs"] < min_pairs]
+        if not missing.empty:
+            subset_cols = ["comparator", "metric", "n_pairs"]
+            details = ", ".join(
+                [
+                    f"{r['comparator']}:{r['metric']}={int(r['n_pairs'])}"
+                    for _, r in missing[subset_cols].iterrows()
+                ]
+            )
+            raise SystemExit(
+                f"n_pairs check failed (required >= {min_pairs}): {details}"
+            )
+
     summary_df.to_csv(out_csv, index=False)
     print(f"Saved: {out_csv}")
 
@@ -229,4 +254,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
