@@ -59,6 +59,16 @@ class DetectorConfig:
     patience: int = 20  # early stopping patience (0 = off)
     jitter_std: float = 0.01  # Gaussian noise augmentation during training
 
+    # normalization
+    revin: bool = True
+    """Per-window (instance) normalization.
+
+    When True, each sliding window is independently normalised to zero mean
+    and unit variance *before* being fed to the model.  This makes the model
+    robust to non-stationary data (e.g. financial, cloud metrics) where the
+    global mean/std of the training set may differ from the test period.
+    """
+
     # regularization (light defaults — for anomaly detection we *want*
     # delta_tau to vary, so time_reg should be weaker than RL defaults)
     time_reg: TimeRegConfig = field(
@@ -88,13 +98,27 @@ def _to_windows(
     data: np.ndarray,
     window_size: int,
     stride: int,
+    revin: bool = False,
 ) -> np.ndarray:
-    """Slide a window over a 2-D array and return ``(N, W, D)``."""
+    """Slide a window over a 2-D array and return ``(N, W, D)``.
+
+    Parameters
+    ----------
+    revin : bool
+        If True, normalise each window by its own mean and std.
+    """
     T, D = data.shape
     starts = list(range(0, T - window_size + 1, stride))
     if not starts:
         starts = [0]
-    windows = np.stack([data[s : s + window_size] for s in starts])
+    windows = np.stack([data[s : s + window_size] for s in starts])  # (N, W, D)
+
+    if revin:
+        # Per-window normalisation: each window to zero-mean, unit-variance
+        wmean = windows.mean(axis=1, keepdims=True)       # (N, 1, D)
+        wstd  = windows.std(axis=1, keepdims=True) + 1e-8
+        windows = (windows - wmean) / wstd
+
     return windows
 
 
@@ -205,14 +229,15 @@ class TemporalAnomalyDetector:
                 f"Expected input_dim={self.input_dim}, got {arr.shape[-1]}"
             )
 
-        # Fit normalisation
-        self._train_mean = arr.mean(axis=0)
-        self._train_std = arr.std(axis=0)
-        arr = self._normalize(arr)
+        # Fit global normalisation (robust: median + IQR-sigma)
+        self._train_mean = np.median(arr, axis=0).astype(np.float32)
+        iqr = (np.percentile(arr, 75, axis=0) - np.percentile(arr, 25, axis=0)).astype(np.float32)
+        self._train_std = (iqr / 1.3489 + 1e-8).astype(np.float32)
+        arr = self._normalize(arr).astype(np.float32)
 
-        # Window
+        # Window (with optional per-window RevIN)
         stride = self.cfg.stride or max(1, self.cfg.window_size // 4)
-        windows = _to_windows(arr, self.cfg.window_size, stride)
+        windows = _to_windows(arr, self.cfg.window_size, stride, revin=self.cfg.revin)
         n_windows = len(windows)
 
         # Train / val split
@@ -226,9 +251,6 @@ class TemporalAnomalyDetector:
         self._history = {"train_loss": [], "val_loss": []}
 
         # ---- Phase 1: stable self-model training ----
-        # Detach alpha from the graph so the time head cannot destabilise
-        # hidden-state dynamics.  The self-model learns to predict normal
-        # temporal patterns on a stable GRU trajectory.
         phase1_epochs = max(1, int(self.cfg.epochs * 0.7))
         phase2_epochs = self.cfg.epochs - phase1_epochs
 
@@ -357,43 +379,149 @@ class TemporalAnomalyDetector:
             ).item()
 
     def _calibrate_scores(self, arr_normed: np.ndarray) -> None:
-        """Run inference on training data to get baseline score statistics."""
+        """Calibrate score statistics from training data using robust IQR-based stats."""
         raw_scores = self._raw_score(arr_normed)
-        self._score_mean = float(np.mean(raw_scores))
-        self._score_std = float(np.std(raw_scores)) + 1e-8
+        q25, q50, q75 = np.percentile(raw_scores, [25, 50, 75])
+        iqr = q75 - q25
+        self._score_mean = float(q50)
+        # IQR / 1.3489 ≈ σ for a normal distribution — robust to outliers
+        self._score_std = float(max(iqr / 1.3489, 1e-8))
 
     # ------------------------------------------------------------------
     # Scoring
     # ------------------------------------------------------------------
 
-    def _raw_score(self, arr_normed: np.ndarray) -> np.ndarray:
-        """Run model on normalised data, return per-step raw scores."""
+    def _window_scores(
+        self,
+        chunk: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Run the model on a single chunk and return (tau, pred_error, alpha)."""
         self.model.eval()
-        x = torch.tensor(arr_normed, device=self.device).unsqueeze(0)  # (1, T, D)
+        x = torch.tensor(chunk[None], device=self.device)
         with torch.no_grad():
             out = self.model.forward_sequence(x)
-
         tau = out.delta_taus.squeeze(0).cpu().numpy()
-        pe = out.pred_errors.squeeze(0).cpu().numpy()
+        pe  = out.pred_errors.squeeze(0).cpu().numpy()
+        alp = out.alphas.squeeze(0).cpu().numpy()
+        return tau, pe, alp
 
-        if self.cfg.score_mode == "delta_tau":
-            # Use absolute deviation — anomalies can push tau up OR down
-            raw = np.abs(tau - tau.mean())
-        elif self.cfg.score_mode == "pred_error":
-            raw = pe
-        elif self.cfg.score_mode == "combined":
-            # Combine z-normalised |tau deviation| and prediction error
+    def _combine_signals(
+        self,
+        tau: np.ndarray,
+        pe: np.ndarray,
+    ) -> np.ndarray:
+        """Combine tau deviation and pred_error into a single raw score."""
+        if self.cfg.score_mode == "pred_error":
+            return pe
+        elif self.cfg.score_mode == "delta_tau":
             tau_dev = np.abs(tau - tau.mean())
-            tau_n = tau_dev / (tau_dev.std() + 1e-8)
-            pe_n = pe / (pe.std() + 1e-8)
-            raw = (tau_n + pe_n) / 2.0
+            return tau_dev
+        elif self.cfg.score_mode == "combined":
+            tau_dev = np.abs(tau - tau.mean())
+            tau_z = tau_dev / (tau_dev.std() + 1e-8)
+            pe_z  = pe / (pe.std() + 1e-8)
+            return (tau_z + pe_z) / 2.0
         else:
             raise ValueError(f"Unknown score_mode: {self.cfg.score_mode}")
 
-        # Optional smoothing
+    def _raw_score(self, arr_normed: np.ndarray) -> np.ndarray:
+        """Per-timestep raw anomaly score on globally-normalised data.
+
+        When ``revin=True``, uses overlapping windowed scoring where each
+        window is independently normalised (RevIN).  This handles non-
+        stationary data where the test period may differ from training.
+
+        When ``revin=False``, runs the full sequence in one pass (original
+        behaviour, faster but sensitive to distribution shift).
+        """
+        if self.cfg.revin:
+            return self._raw_score_windowed(arr_normed)
+        return self._raw_score_full(arr_normed)
+
+    def _raw_score_full(self, arr_normed: np.ndarray) -> np.ndarray:
+        """Original single-pass full-sequence scoring."""
+        tau, pe, _ = self._window_scores(arr_normed)
+        raw = self._combine_signals(tau, pe)
         if self.cfg.score_smoothing > 1:
             kernel = np.ones(self.cfg.score_smoothing) / self.cfg.score_smoothing
             raw = np.convolve(raw, kernel, mode="same")
+        return raw
+
+    def _raw_score_windowed(self, arr_normed: np.ndarray) -> np.ndarray:
+        """Windowed scoring with per-window RevIN normalisation.
+
+        Processes overlapping windows and aggregates by taking the maximum
+        score for each timestep (best-view aggregation).  Each window is
+        independently normalised before being fed to the model, making the
+        scoring robust to distribution shift within the sequence.
+        """
+        T = len(arr_normed)
+        window_size = self.cfg.window_size
+        stride = max(1, window_size // 4)
+
+        score_max = np.full(T, -1e9, dtype=np.float32)
+        alpha_sum = np.zeros(T, dtype=np.float32)
+        alpha_cnt = np.zeros(T, dtype=np.int32)
+        tau_sum   = np.zeros(T, dtype=np.float32)
+        pe_sum    = np.zeros(T, dtype=np.float32)
+
+        # Build window start positions that cover every timestep
+        starts = list(range(0, T - window_size + 1, stride))
+        if not starts or starts[-1] + window_size < T:
+            starts.append(max(0, T - window_size))
+        starts = sorted(set(starts))
+
+        # Batch windows for efficient GPU/CPU use
+        batch_size = 64
+        window_list = []
+        for s in starts:
+            end = s + window_size
+            chunk = arr_normed[s:end]
+            if len(chunk) < window_size:
+                pad = np.zeros((window_size - len(chunk), arr_normed.shape[1]), dtype=np.float32)
+                chunk = np.concatenate([chunk, pad], axis=0)
+            # RevIN: per-window normalisation
+            c_mean = chunk.mean(axis=0, keepdims=True)
+            c_std  = chunk.std(axis=0, keepdims=True) + 1e-8
+            window_list.append((s, (chunk - c_mean) / c_std))
+
+        self.model.eval()
+        with torch.no_grad():
+            for b in range(0, len(window_list), batch_size):
+                batch_starts  = [w[0] for w in window_list[b : b + batch_size]]
+                batch_windows = np.stack([w[1] for w in window_list[b : b + batch_size]])
+                x = torch.tensor(batch_windows, device=self.device)
+                out = self.model.forward_sequence(x)
+
+                taus  = out.delta_taus.cpu().numpy()   # (B, W)
+                pes   = out.pred_errors.cpu().numpy()  # (B, W)
+                alps  = out.alphas.cpu().numpy()       # (B, W)
+
+                for j, s in enumerate(batch_starts):
+                    end = min(s + window_size, T)
+                    L   = end - s
+                    tau_w = taus[j, :L]
+                    pe_w  = pes[j, :L]
+                    alp_w = alps[j, :L]
+                    local = self._combine_signals(tau_w, pe_w)
+                    score_max[s:end] = np.maximum(score_max[s:end], local)
+                    alpha_sum[s:end] += alp_w
+                    alpha_cnt[s:end] += 1
+                    tau_sum[s:end]   += tau_w
+                    pe_sum[s:end]    += pe_w
+
+        raw = score_max.copy()
+        raw[raw == -1e9] = 0.0  # guard against uncovered positions
+
+        if self.cfg.score_smoothing > 1:
+            kernel = np.ones(self.cfg.score_smoothing) / self.cfg.score_smoothing
+            raw = np.convolve(raw, kernel, mode="same")
+
+        # Store aggregated signals for score_detail
+        cnt = np.maximum(alpha_cnt, 1)
+        self._last_alpha   = alpha_sum / cnt
+        self._last_tau     = tau_sum   / cnt
+        self._last_pe      = pe_sum    / cnt
 
         return raw
 
@@ -432,17 +560,29 @@ class TemporalAnomalyDetector:
         arr = _prepare_data(data)
         arr = self._normalize(arr)
 
-        self.model.eval()
-        x = torch.tensor(arr, device=self.device).unsqueeze(0)
-        with torch.no_grad():
-            out = self.model.forward_sequence(x)
-
+        # _raw_score populates _last_{alpha,tau,pe} as a side-effect
         scores = self.score(data)
+
+        if self.cfg.revin:
+            # Populated by _raw_score_windowed
+            delta_tau  = getattr(self, "_last_tau",   np.zeros(len(arr)))
+            pred_error = getattr(self, "_last_pe",    np.zeros(len(arr)))
+            alpha      = getattr(self, "_last_alpha", np.zeros(len(arr)))
+        else:
+            # Re-run full sequence to get signals
+            x = torch.tensor(arr, device=self.device).unsqueeze(0)
+            self.model.eval()
+            with torch.no_grad():
+                out = self.model.forward_sequence(x)
+            delta_tau  = out.delta_taus.squeeze(0).cpu().numpy()
+            pred_error = out.pred_errors.squeeze(0).cpu().numpy()
+            alpha      = out.alphas.squeeze(0).cpu().numpy()
+
         return {
-            "score": scores,
-            "delta_tau": out.delta_taus.squeeze(0).cpu().numpy(),
-            "pred_error": out.pred_errors.squeeze(0).cpu().numpy(),
-            "alpha": out.alphas.squeeze(0).cpu().numpy(),
+            "score":       scores,
+            "delta_tau":   delta_tau,
+            "pred_error":  pred_error,
+            "alpha":       alpha,
         }
 
     def detect(
@@ -497,10 +637,10 @@ class TemporalAnomalyDetector:
         )
         det.model.load_state_dict(state["model_state"])
         det._train_mean = state["train_mean"]
-        det._train_std = state["train_std"]
+        det._train_std  = state["train_std"]
         det._score_mean = state["score_mean"]
-        det._score_std = state["score_std"]
-        det._fitted = state["fitted"]
+        det._score_std  = state["score_std"]
+        det._fitted     = state["fitted"]
         return det
 
     # ------------------------------------------------------------------
@@ -508,20 +648,7 @@ class TemporalAnomalyDetector:
     # ------------------------------------------------------------------
 
     def create_streaming_scorer(self, threshold: float = 2.0) -> "StreamingScorer":
-        """Create a streaming scorer for real-time use.
-
-        The returned :class:`StreamingScorer` holds hidden state internally
-        and accepts one observation at a time via :meth:`StreamingScorer.step`.
-
-        Parameters
-        ----------
-        threshold : float
-            Z-score threshold for the ``is_anomaly`` flag in step output.
-
-        Returns
-        -------
-        StreamingScorer
-        """
+        """Create a streaming scorer for real-time use."""
         if not self._fitted:
             raise RuntimeError("Call .fit() before .create_streaming_scorer()")
         return StreamingScorer(detector=self, threshold=threshold)
@@ -551,37 +678,23 @@ class StreamingScorer:
 
     Do not instantiate directly — use
     :meth:`TemporalAnomalyDetector.create_streaming_scorer`.
-
-    Parameters
-    ----------
-    detector : TemporalAnomalyDetector
-        A *fitted* detector whose model and calibration stats are used.
-    threshold : float
-        Z-score threshold for the ``is_anomaly`` flag.
     """
 
     def __init__(self, detector: TemporalAnomalyDetector, threshold: float = 2.0) -> None:
         if not detector._fitted:
             raise RuntimeError("Detector must be fitted before creating a StreamingScorer")
-        self._detector = detector
-        self._model = detector.model
-        self._device = detector.device
-        self._threshold = threshold
-
-        # Normalization stats from training
+        self._detector   = detector
+        self._model      = detector.model
+        self._device     = detector.device
+        self._threshold  = threshold
         self._train_mean = detector._train_mean
-        self._train_std = detector._train_std
-
-        # Score calibration stats from training
+        self._train_std  = detector._train_std
         self._score_mean = detector._score_mean
-        self._score_std = detector._score_std
-
-        # Hidden state — initialised on first step or via reset()
+        self._score_std  = detector._score_std
         self._hidden: torch.Tensor | None = None
 
     @property
     def threshold(self) -> float:
-        """Current anomaly threshold (z-score)."""
         return self._threshold
 
     @threshold.setter
@@ -593,86 +706,47 @@ class StreamingScorer:
         self._hidden = None
 
     def step(self, obs: np.ndarray) -> dict[str, float | bool]:
-        """Process a single observation and return anomaly information.
-
-        Parameters
-        ----------
-        obs : ndarray, shape ``(D,)``
-            A single observation vector.
-
-        Returns
-        -------
-        dict with keys:
-
-        * ``score`` (float) — z-normalised anomaly score.
-        * ``delta_tau`` (float) — internal time step.
-        * ``pred_error`` (float) — self-model prediction error.
-        * ``is_anomaly`` (bool) — True if score exceeds threshold.
-        """
+        """Process a single observation and return anomaly information."""
         obs = np.asarray(obs, dtype=np.float32)
         if obs.ndim == 0:
             obs = obs.reshape(1)
         if obs.ndim != 1:
             raise ValueError(f"Expected 1-D observation, got shape {obs.shape}")
 
-        # Normalise using training statistics
         if self._train_mean is not None and self._train_std is not None:
             obs_normed = (obs - self._train_mean) / (self._train_std + 1e-8)
         else:
             obs_normed = obs
 
-        # Convert to tensor: shape (1, D)
         x = torch.tensor(obs_normed, device=self._device).unsqueeze(0)
 
-        # Initialise hidden state on first call
         if self._hidden is None:
             self._hidden = self._model.init_hidden(batch_size=1, device=self._device)
 
-        # Single-step forward
         self._model.eval()
         with torch.no_grad():
             step_out = self._model(x, self._hidden)
 
-        # Update hidden state
-        self._hidden = step_out.hidden
-
-        delta_tau = float(step_out.delta_tau.item())
-        pred_error = float(step_out.pred_error.item())
-
-        # Compute raw score using the same logic as the detector
-        raw_score = self._compute_raw_score(delta_tau, pred_error)
-
-        # Z-normalise using training calibration
-        score = (raw_score - self._score_mean) / self._score_std
+        self._hidden  = step_out.hidden
+        delta_tau     = float(step_out.delta_tau.item())
+        pred_error    = float(step_out.pred_error.item())
+        raw_score     = self._compute_raw_score(delta_tau, pred_error)
+        score         = (raw_score - self._score_mean) / self._score_std
 
         return {
-            "score": score,
-            "delta_tau": delta_tau,
+            "score":      score,
+            "delta_tau":  delta_tau,
             "pred_error": pred_error,
             "is_anomaly": bool(score > self._threshold),
         }
 
     def _compute_raw_score(self, delta_tau: float, pred_error: float) -> float:
-        """Compute raw score from a single step's outputs.
-
-        For streaming use we cannot compute batch statistics (mean/std of
-        tau over the sequence) as we only have one step.  We use
-        ``pred_error`` as the raw score, which is the most reliable
-        single-step signal: it directly measures how surprising the
-        current transition is to the self-model.  The calibration
-        (z-normalisation against training scores) then places it on the
-        same scale as batch scores.
-        """
         score_mode = self._detector.cfg.score_mode
         if score_mode == "pred_error":
             return pred_error
         elif score_mode == "delta_tau":
             return delta_tau
         elif score_mode == "combined":
-            # With a single step we cannot z-normalise within the sequence,
-            # so we average the two raw signals.  The z-normalisation
-            # against training calibration stats (applied by the caller)
-            # handles the scale alignment.
             return (delta_tau + pred_error) / 2.0
         else:
             raise ValueError(f"Unknown score_mode: {score_mode}")

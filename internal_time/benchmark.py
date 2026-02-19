@@ -194,7 +194,7 @@ def evaluate_file(
 
     # Find best threshold
     best_f1, best_thr = 0.0, threshold
-    for thr in [1.0, 1.5, 2.0, 2.5, 3.0, 3.5]:
+    for thr in [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.5, 4.0]:
         pred = (scores > thr).astype(np.int32)
         m = compute_metrics(pred, labels)
         if m["pa_f1"] > best_f1:

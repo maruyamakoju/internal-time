@@ -1,5 +1,5 @@
 """
-Gradio demo for internal-time anomaly detector.
+Gradio demo for internal-time anomaly detector (Japanese UI).
 """
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import gradio as gr
+from pathlib import Path
 
 from internal_time import TemporalAnomalyDetector
 from internal_time.viz import plot_anomaly_scores, plot_detail
@@ -25,8 +26,17 @@ def _base_signal(T: int, seed: int = 0) -> np.ndarray:
     return x.astype(np.float32)
 
 
-def make_synthetic(anomaly_type: str, T: int = 600, seed: int = 42) -> tuple[np.ndarray, np.ndarray]:
-    """Return (values [T,1], labels [T]) for the chosen anomaly type."""
+ANOMALY_TYPES = {
+    "スパイク（突発的な外れ値）": "Spike",
+    "レベルシフト（平均値の変化）": "Step (mean shift)",
+    "振動変化（周波数の変化）": "Oscillation (freq change)",
+    "分散バースト（ノイズ急増）": "Variance burst",
+    "複合異常（スパイク＋レベルシフト）": "Mixed",
+}
+
+
+def make_synthetic(anomaly_label: str, T: int = 600, seed: int = 42) -> tuple[np.ndarray, np.ndarray]:
+    anomaly_type = ANOMALY_TYPES.get(anomaly_label, anomaly_label)
     rng = np.random.default_rng(seed)
     x = _base_signal(T, seed)
     labels = np.zeros(T, dtype=np.int32)
@@ -98,14 +108,14 @@ def run_detection(
         scores=scores,
         threshold=threshold,
         labels_true=labels,
-        title="Anomaly Detection — internal-time",
+        title="異常検知結果 — internal-time",
         figsize=(12, 5),
     )
 
     fig2 = plot_detail(
         detail=detail,
         data=values,
-        title="Internal Signals (\u0394\u03c4, pred_error, \u03b1)",
+        title="内部シグナル (\u0394\u03c4, pred_error, \u03b1)",
         figsize=(12, 5),
     )
 
@@ -114,12 +124,12 @@ def run_detection(
         from internal_time.benchmark import compute_metrics
         m = compute_metrics(preds, labels)
         lines += [
-            f"**Point-wise F1**: {m['f1']:.3f}  (precision {m['precision']:.3f}, recall {m['recall']:.3f})",
-            f"**Point-adjusted F1**: {m['pa_f1']:.3f}  (precision {m['pa_precision']:.3f}, recall {m['pa_recall']:.3f})",
+            f"**点単位 F1**: {m['f1']:.3f}　(適合率 {m['precision']:.3f}、再現率 {m['recall']:.3f})",
+            f"**点調整 F1 (pa-F1)**: {m['pa_f1']:.3f}　(適合率 {m['pa_precision']:.3f}、再現率 {m['pa_recall']:.3f})",
         ]
     lines += [
-        f"**Score range**: [{scores.min():.2f}, {scores.max():.2f}]",
-        f"**Flagged timesteps**: {int(preds.sum())} / {T}",
+        f"**スコア範囲**: [{scores.min():.2f}, {scores.max():.2f}]",
+        f"**異常フラグ**: {int(preds.sum())} / {T} タイムステップ",
     ]
     stats = "\n\n".join(lines)
     return fig1, fig2, stats
@@ -129,36 +139,26 @@ def run_detection(
 # Gradio callbacks
 # ---------------------------------------------------------------------------
 
-def demo_callback(
-    anomaly_type: str,
-    epochs: int,
-    threshold: float,
-    progress: gr.Progress = gr.Progress(),
-) -> tuple:
-    progress(0.0, desc="Generating synthetic data…")
-    values, labels = make_synthetic(anomaly_type)
-    progress(0.1, desc="Training detector…")
-    fig1, fig2, stats = run_detection(values, labels, epochs=int(epochs), threshold=float(threshold))
-    progress(1.0, desc="Done")
-    return fig1, fig2, stats
+def demo_callback(anomaly_type: str, epochs: int, threshold: float) -> tuple:
+    try:
+        values, labels = make_synthetic(anomaly_type)
+        fig1, fig2, stats = run_detection(
+            values, labels, epochs=int(epochs), threshold=float(threshold)
+        )
+        return fig1, fig2, stats
+    except Exception as e:
+        return None, None, f"エラーが発生しました: {e}"
 
 
-def upload_callback(
-    file,
-    epochs: int,
-    threshold: float,
-    label_col: str,
-    progress: gr.Progress = gr.Progress(),
-) -> tuple:
+def upload_callback(file, epochs: int, threshold: float, label_col: str) -> tuple:
     if file is None:
-        return None, None, "Please upload a CSV file."
+        return None, None, "CSVファイルをアップロードしてください。"
 
-    progress(0.0, desc="Reading CSV…")
     try:
         path = file.name if hasattr(file, "name") else file
         df = pd.read_csv(path)
     except Exception as e:
-        return None, None, f"Error reading CSV: {e}"
+        return None, None, f"CSV読み込みエラー: {e}"
 
     label_col = (label_col or "").strip()
     labels = None
@@ -169,19 +169,17 @@ def upload_callback(
 
     value_cols = [c for c in df.columns if c not in skip]
     if not value_cols:
-        return None, None, "No value columns found."
+        return None, None, "数値列が見つかりませんでした。"
 
     values = df[value_cols].values.astype(np.float32)
 
-    progress(0.1, desc="Training detector…")
     try:
         fig1, fig2, stats = run_detection(
             values, labels, epochs=int(epochs), threshold=float(threshold)
         )
     except Exception as e:
-        return None, None, f"Detection error: {e}"
+        return None, None, f"検知エラー: {e}"
 
-    progress(1.0, desc="Done")
     return fig1, fig2, stats
 
 
@@ -190,45 +188,58 @@ def upload_callback(
 # ---------------------------------------------------------------------------
 
 DESCRIPTION = """
-# Internal Time — Temporal Anomaly Detector
+# Internal Time — 時系列異常検知
 
-An AI agent learns its own **internal clock**. When something unexpected happens,
-the clock reacts — giving a natural anomaly signal that captures *temporal surprise*,
-not just static outliers.
+AIエージェントが自分自身の**内部時計**を学習します。予期しない変化が起きると、内部時計が反応し、
+*時間的な驚き*を捉えた自然な異常シグナルを生成します。
 
-- **pa-F1 0.775** overall on the [NAB benchmark](https://github.com/numenta/NAB) (52 real-world files)
-- Works on any univariate or multivariate time series
-- No labels required — fully self-supervised
+- **NABベンチマーク**（52の実世界ファイル）で高精度達成
+- 1変量・多変量の時系列データに対応
+- ラベル不要 — 完全教師なし学習
 """
 
-ANOMALY_TYPES = [
-    "Spike",
-    "Step (mean shift)",
-    "Oscillation (freq change)",
-    "Variance burst",
-    "Mixed",
-]
+REAL_EXAMPLES = {
+    "NYC タクシー乗車数（ハロウィン異常）": "examples/nyc_taxi_sample.csv",
+}
 
-with gr.Blocks(theme=gr.themes.Soft(), title="Internal Time") as demo:
+
+def real_example_callback(example_name: str, epochs: int, threshold: float) -> tuple:
+    path = REAL_EXAMPLES.get(example_name)
+    if path is None or not Path(path).exists():
+        return None, None, f"サンプルファイルが見つかりません: {path}"
+    try:
+        df = pd.read_csv(path)
+        value_cols = [c for c in df.columns if c != "timestamp"]
+        values = df[value_cols].values.astype(np.float32)
+        fig1, fig2, stats = run_detection(values, None, epochs=int(epochs), threshold=float(threshold))
+        return fig1, fig2, stats
+    except Exception as e:
+        return None, None, f"エラー: {e}"
+
+with gr.Blocks(theme=gr.themes.Soft(), title="Internal Time 異常検知") as demo:
     gr.Markdown(DESCRIPTION)
 
     with gr.Tabs():
 
-        # ---- Tab 1: Quick Demo ----------------------------------------
-        with gr.Tab("Quick Demo"):
+        # ---- Tab 1: クイックデモ ----------------------------------------
+        with gr.Tab("クイックデモ"):
             gr.Markdown(
-                "Select an anomaly type and click **Run**. "
-                "The model trains on the first 50% (normal) then scores the full sequence."
+                "異常タイプを選んで **実行** を押してください。"
+                "前半50%を正常データとして学習し、全体をスコアリングします。"
             )
             with gr.Row():
-                atype = gr.Dropdown(ANOMALY_TYPES, value="Spike", label="Anomaly type")
-                epochs_s = gr.Slider(10, 100, value=40, step=5, label="Training epochs")
-                thr_s = gr.Slider(0.5, 4.0, value=2.0, step=0.1, label="Threshold (\u03c3)")
-                run_btn = gr.Button("Run", variant="primary")
+                atype = gr.Dropdown(
+                    list(ANOMALY_TYPES.keys()),
+                    value="スパイク（突発的な外れ値）",
+                    label="異常タイプ",
+                )
+                epochs_s = gr.Slider(10, 100, value=40, step=5, label="学習エポック数")
+                thr_s = gr.Slider(0.5, 4.0, value=2.0, step=0.1, label="検出閾値 (\u03c3)")
+                run_btn = gr.Button("実行", variant="primary")
 
-            stats_out = gr.Markdown()
-            fig_main = gr.Plot(label="Time series + anomaly scores")
-            fig_detail = gr.Plot(label="Internal signals (\u0394\u03c4, pred_error, \u03b1)")
+            stats_out = gr.Markdown(value="← **実行** を押すと結果が表示されます")
+            fig_main = gr.Plot(label="時系列データ＋異常スコア")
+            fig_detail = gr.Plot(label="内部シグナル（\u0394\u03c4・予測誤差・\u03b1）")
 
             run_btn.click(
                 fn=demo_callback,
@@ -236,26 +247,26 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Internal Time") as demo:
                 outputs=[fig_main, fig_detail, stats_out],
             )
 
-        # ---- Tab 2: Upload CSV ----------------------------------------
-        with gr.Tab("Upload Your CSV"):
+        # ---- Tab 2: CSVアップロード ----------------------------------------
+        with gr.Tab("CSV アップロード"):
             gr.Markdown(
-                "Upload any CSV with numeric columns. "
-                "Optional `timestamp` column is ignored. "
-                "Optional binary label column (0/1) enables metric display."
+                "数値列を含むCSVファイルをアップロードしてください。\n"
+                "- `timestamp` 列は自動的に無視されます\n"
+                "- 0/1 のラベル列がある場合は列名を指定するとF1スコアが表示されます"
             )
             with gr.Row():
-                csv_file = gr.File(label="CSV file", file_types=[".csv"])
+                csv_file = gr.File(label="CSV ファイル", file_types=[".csv"])
                 label_col_in = gr.Textbox(
-                    label="Label column name (optional)", placeholder="e.g. label"
+                    label="ラベル列名（任意）", placeholder="例: label"
                 )
             with gr.Row():
-                epochs_u = gr.Slider(10, 100, value=40, step=5, label="Training epochs")
-                thr_u = gr.Slider(0.5, 4.0, value=2.0, step=0.1, label="Threshold (\u03c3)")
-                run_btn_u = gr.Button("Run", variant="primary")
+                epochs_u = gr.Slider(10, 100, value=40, step=5, label="学習エポック数")
+                thr_u = gr.Slider(0.5, 4.0, value=2.0, step=0.1, label="検出閾値 (\u03c3)")
+                run_btn_u = gr.Button("実行", variant="primary")
 
-            stats_out_u = gr.Markdown()
-            fig_main_u = gr.Plot(label="Time series + anomaly scores")
-            fig_detail_u = gr.Plot(label="Internal signals")
+            stats_out_u = gr.Markdown(value="← **実行** を押すと結果が表示されます")
+            fig_main_u = gr.Plot(label="時系列データ＋異常スコア")
+            fig_detail_u = gr.Plot(label="内部シグナル")
 
             run_btn_u.click(
                 fn=upload_callback,
@@ -263,12 +274,38 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Internal Time") as demo:
                 outputs=[fig_main_u, fig_detail_u, stats_out_u],
             )
 
+        # ---- Tab 3: 実データサンプル ----------------------------------------
+        with gr.Tab("実データサンプル"):
+            gr.Markdown(
+                "実際の時系列データ（NABベンチマーク収録）で試せます。\n"
+                "- **NYC タクシー乗車数**: ハロウィン（10月31日）前後の異常な乗車数増加を検知します"
+            )
+            with gr.Row():
+                example_sel = gr.Dropdown(
+                    list(REAL_EXAMPLES.keys()),
+                    value=list(REAL_EXAMPLES.keys())[0],
+                    label="データセット",
+                )
+                epochs_r = gr.Slider(10, 100, value=30, step=5, label="学習エポック数")
+                thr_r = gr.Slider(0.5, 4.0, value=2.0, step=0.1, label="検出閾値 (σ)")
+                run_btn_r = gr.Button("実行", variant="primary")
+
+            stats_out_r = gr.Markdown(value="← **実行** を押すと結果が表示されます")
+            fig_main_r = gr.Plot(label="時系列データ＋異常スコア")
+            fig_detail_r = gr.Plot(label="内部シグナル")
+
+            run_btn_r.click(
+                fn=real_example_callback,
+                inputs=[example_sel, epochs_r, thr_r],
+                outputs=[fig_main_r, fig_detail_r, stats_out_r],
+            )
+
     gr.Markdown(
         "---\n"
-        "**How it works**: A GRU processes the sequence step by step. "
-        "A *self-model* predicts each next hidden state. "
-        "When the prediction error is high, the agent's internal clock Δτ reacts — "
-        "flagging *temporal surprise*. Trained on normal data only; no labels needed.\n\n"
+        "**仕組み**: GRUが時系列をステップごとに処理します。"
+        "*自己モデル*が次の隠れ状態を予測し、予測誤差が高いとき、"
+        "エージェントの内部時計 Δτ が反応して*時間的な驚き*を検出します。"
+        "正常データのみで学習するため、ラベルは不要です。\n\n"
         "MIT License"
     )
 
