@@ -12,7 +12,7 @@ from pathlib import Path
 from huggingface_hub import HfApi
 
 
-def deploy(token: str, space_id: str) -> None:
+def deploy(token: str, space_id: str, create_pr: bool = False) -> None:
     api = HfApi(token=token)
 
     # Create space (no-op if already exists)
@@ -33,13 +33,19 @@ def deploy(token: str, space_id: str) -> None:
         repo_id=space_id,
         repo_type="space",
         commit_message="deploy internal-time demo v0.3.2",
+        create_pr=create_pr,
     )
-    print(f"\nDone! Visit: https://huggingface.co/spaces/{space_id}")
+    if create_pr:
+        print(f"\nPR created! Review at: https://huggingface.co/spaces/{space_id}/discussions")
+    else:
+        print(f"\nDone! Visit: https://huggingface.co/spaces/{space_id}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--token", required=True, help="HF write token (hf_...)")
     parser.add_argument("--space", default="marubobiz/internal-time-demo")
+    parser.add_argument("--create-pr", action="store_true",
+                        help="Create a PR instead of pushing directly (for fine-grained tokens)")
     args = parser.parse_args()
-    deploy(args.token, args.space)
+    deploy(args.token, args.space, create_pr=args.create_pr)
