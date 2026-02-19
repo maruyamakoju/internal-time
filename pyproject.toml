@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "internal-time"
-version = "0.3.1"
+version = "0.3.2"
 description = "Temporal anomaly detection via learned internal time — adaptive temporal reparameterization"
 license = {text = "MIT"}
 requires-python = ">=3.11"

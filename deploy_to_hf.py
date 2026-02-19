@@ -32,7 +32,7 @@ def deploy(token: str, space_id: str) -> None:
         folder_path=str(space_dir),
         repo_id=space_id,
         repo_type="space",
-        commit_message="deploy internal-time demo v0.3.1",
+        commit_message="deploy internal-time demo v0.3.2",
     )
     print(f"\nDone! Visit: https://huggingface.co/spaces/{space_id}")
 

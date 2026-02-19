@@ -17,17 +17,17 @@ not just static outliers.
 
 ## Results
 
-**pa-F1 0.814** overall on the NAB benchmark (52 real-world time series files):
+**pa-F1 0.854** overall on the NAB benchmark (52 real-world time series files, 3-run median):
 
 | Category | Files | pa-F1 |
 |---|---|---|
-| artificialWithAnomaly | 6 | **0.947** |
-| realTweets | 10 | **0.887** |
-| realKnownCause | 7 | **0.844** |
-| realAWSCloudwatch | 16 | **0.836** |
-| realTraffic | 7 | 0.722 |
-| realAdExchange | 6 | 0.574 |
-| **Overall** | **52** | **0.814** |
+| realTweets | 10 | **0.963** |
+| artificialWithAnomaly | 6 | **0.960** |
+| realAWSCloudwatch | 16 | **0.910** |
+| realKnownCause | 7 | **0.869** |
+| realTraffic | 7 | 0.740 |
+| realAdExchange | 6 | 0.533 |
+| **Overall** | **52** | **0.854** |
 
 ## How It Works
 
