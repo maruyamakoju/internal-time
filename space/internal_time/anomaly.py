@@ -566,7 +566,7 @@ class TemporalAnomalyDetector:
         # Fix A: large-window pass — always use within-window tau mean (tau_ref=None).
         # Using the small-window tau_ref here would cause systematic score inflation
         # because large-window tau values live on a different scale.
-        large_ws = min(small_ws * 4, T // 3)
+        large_ws = min(small_ws * 8, T // 3)
         if large_ws >= small_ws * 2:
             score_large, _, _, _, _ = self._run_windowed_pass(arr_normed, large_ws, tau_ref=None)
         else:

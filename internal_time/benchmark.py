@@ -18,6 +18,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import torch
 
 from .anomaly import TemporalAnomalyDetector
 
@@ -158,8 +159,15 @@ def evaluate_file(
     threshold: float = 2.0,
     detector_kwargs: dict[str, Any] | None = None,
     device: str = "cpu",
+    seed: int | None = None,
 ) -> DetectionMetrics:
     """Train on the first portion of a NAB file, score the rest."""
+    if seed is not None:
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+
     timestamps, values = load_nab_file(csv_path)
     labels = make_labels_array(timestamps, windows)
     T, D = values.shape
@@ -232,6 +240,8 @@ def run_nab_benchmark(
     device: str = "cpu",
     max_files: int | None = None,
     detector_kwargs: dict[str, Any] | None = None,
+    n_runs: int = 1,
+    base_seed: int = 42,
 ) -> pd.DataFrame:
     """Run benchmark on all NAB files.
 
@@ -246,6 +256,10 @@ def run_nab_benchmark(
         Limit number of files (for quick testing).
     detector_kwargs : dict or None
         Override detector parameters.
+    n_runs : int
+        Number of runs per file (median used for final score).
+    base_seed : int
+        Base random seed; run *k* uses ``base_seed + k``.
 
     Returns
     -------
@@ -277,13 +291,37 @@ def run_nab_benchmark(
 
         print(f"  [{i+1}/{len(files)}] {rel_path} ", end="", flush=True)
         try:
-            m = evaluate_file(
-                csv_path, windows,
-                device=device,
-                detector_kwargs=detector_kwargs,
-            )
-            print(f"pa_F1={m.pa_f1:.3f}  thr={m.threshold}  ({m.train_time_s:.1f}s)")
-            results.append({
+            # Run N times with different seeds
+            run_metrics: list[DetectionMetrics] = []
+            for run_idx in range(n_runs):
+                seed = base_seed + run_idx
+                m = evaluate_file(
+                    csv_path, windows,
+                    device=device,
+                    detector_kwargs=detector_kwargs,
+                    seed=seed,
+                )
+                run_metrics.append(m)
+
+            # Pick the median-pa_f1 run
+            pa_f1_values = [rm.pa_f1 for rm in run_metrics]
+            median_idx = int(np.argsort(pa_f1_values)[len(pa_f1_values) // 2])
+            m = run_metrics[median_idx]
+
+            # Format output
+            if n_runs > 1:
+                f1_arr = np.array(pa_f1_values)
+                n_successful = int(np.sum(f1_arr > 0))
+                print(
+                    f"pa_F1={m.pa_f1:.3f} "
+                    f"(med={np.median(f1_arr):.3f} mean={f1_arr.mean():.3f} "
+                    f"std={f1_arr.std():.3f} min={f1_arr.min():.3f} max={f1_arr.max():.3f})  "
+                    f"thr={m.threshold}  ({m.train_time_s:.1f}s)"
+                )
+            else:
+                print(f"pa_F1={m.pa_f1:.3f}  thr={m.threshold}  ({m.train_time_s:.1f}s)")
+
+            row: dict[str, Any] = {
                 "file": rel_path,
                 "category": rel_path.split("/")[0] if "/" in rel_path else "unknown",
                 "precision": m.precision,
@@ -297,7 +335,18 @@ def run_nab_benchmark(
                 "threshold": m.threshold,
                 "train_s": m.train_time_s,
                 "score_s": m.score_time_s,
-            })
+            }
+            if n_runs > 1:
+                f1_arr = np.array(pa_f1_values)
+                row.update({
+                    "pa_f1_mean": float(f1_arr.mean()),
+                    "pa_f1_std": float(f1_arr.std()),
+                    "pa_f1_min": float(f1_arr.min()),
+                    "pa_f1_max": float(f1_arr.max()),
+                    "n_runs": n_runs,
+                    "n_successful_runs": int(np.sum(f1_arr > 0)),
+                })
+            results.append(row)
         except Exception as e:
             print(f"ERROR: {e}")
             results.append({
@@ -346,6 +395,10 @@ def main() -> None:
     parser.add_argument("--max-files", type=int, default=None)
     parser.add_argument("--epochs", type=int, default=60)
     parser.add_argument("--hidden-dim", type=int, default=64)
+    parser.add_argument("--n-runs", type=int, default=1,
+                        help="Number of runs per file (median score used)")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="Base random seed")
     args = parser.parse_args()
 
     kwargs = {"epochs": args.epochs, "hidden_dim": args.hidden_dim}
@@ -355,6 +408,8 @@ def main() -> None:
         device=args.device,
         max_files=args.max_files,
         detector_kwargs=kwargs,
+        n_runs=args.n_runs,
+        base_seed=args.seed,
     )
 
 

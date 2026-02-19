@@ -1,0 +1,7 @@
+category,n_files,pa_f1_mean,pa_f1_std,pa_precision_mean,pa_recall_mean
+artificialWithAnomaly,6,0.96,0.014,0.924,1.0
+realAWSCloudwatch,16,0.91,0.128,0.853,1.0
+realAdExchange,6,0.533,0.245,0.444,0.75
+realKnownCause,7,0.869,0.182,0.826,0.971
+realTraffic,7,0.74,0.24,0.779,0.798
+realTweets,10,0.963,0.018,0.929,1.0
