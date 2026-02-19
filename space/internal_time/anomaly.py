@@ -190,6 +190,7 @@ class TemporalAnomalyDetector:
         self._train_std: np.ndarray | None = None
         self._score_mean: float = 0.0
         self._score_std: float = 1.0
+        self._train_tau_mean: float | None = None   # global tau ref for Fix B
         self._history: dict[str, list[float]] = {"train_loss": [], "val_loss": []}
 
     # ------------------------------------------------------------------
@@ -409,15 +410,25 @@ class TemporalAnomalyDetector:
         self,
         tau: np.ndarray,
         pe: np.ndarray,
+        tau_ref: float | None = None,
     ) -> np.ndarray:
-        """Combine tau deviation and pred_error into a single raw score."""
+        """Combine tau deviation and pred_error into a single raw score.
+
+        Parameters
+        ----------
+        tau_ref : float or None
+            When provided, use as the reference centre for tau deviation
+            (Fix B — global tau mean from training).  When None, falls back
+            to the within-window mean.
+        """
+        center = tau_ref if tau_ref is not None else tau.mean()
         if self.cfg.score_mode == "pred_error":
             return pe
         elif self.cfg.score_mode == "delta_tau":
-            tau_dev = np.abs(tau - tau.mean())
+            tau_dev = np.abs(tau - center)
             return tau_dev
         elif self.cfg.score_mode == "combined":
-            tau_dev = np.abs(tau - tau.mean())
+            tau_dev = np.abs(tau - center)
             tau_z = tau_dev / (tau_dev.std() + 1e-8)
             pe_z  = pe / (pe.std() + 1e-8)
             return (tau_z + pe_z) / 2.0
@@ -447,16 +458,30 @@ class TemporalAnomalyDetector:
             raw = np.convolve(raw, kernel, mode="same")
         return raw
 
-    def _raw_score_windowed(self, arr_normed: np.ndarray) -> np.ndarray:
-        """Windowed scoring with per-window RevIN normalisation.
+    def _run_windowed_pass(
+        self,
+        arr_normed: np.ndarray,
+        window_size: int,
+        tau_ref: float | None,
+    ) -> tuple[np.ndarray, float, np.ndarray, np.ndarray, np.ndarray]:
+        """Single windowed scoring pass at a given scale.
 
-        Processes overlapping windows and aggregates by taking the maximum
-        score for each timestep (best-view aggregation).  Each window is
-        independently normalised before being fed to the model, making the
-        scoring robust to distribution shift within the sequence.
+        Parameters
+        ----------
+        arr_normed : ndarray, shape (T, D)
+        window_size : int
+        tau_ref : float or None
+            Passed through to ``_combine_signals`` for Fix B.
+
+        Returns
+        -------
+        score_max : ndarray (T,)   — raw max-aggregated score, un-smoothed
+        tau_global_mean : float    — mean tau across all windows (for calibration)
+        last_alpha : ndarray (T,)
+        last_tau   : ndarray (T,)
+        last_pe    : ndarray (T,)
         """
         T = len(arr_normed)
-        window_size = self.cfg.window_size
         stride = max(1, window_size // 4)
 
         score_max = np.full(T, -1e9, dtype=np.float32)
@@ -485,6 +510,8 @@ class TemporalAnomalyDetector:
             c_std  = chunk.std(axis=0, keepdims=True) + 1e-8
             window_list.append((s, (chunk - c_mean) / c_std))
 
+        all_tau_vals: list[np.ndarray] = []
+
         self.model.eval()
         with torch.no_grad():
             for b in range(0, len(window_list), batch_size):
@@ -503,25 +530,68 @@ class TemporalAnomalyDetector:
                     tau_w = taus[j, :L]
                     pe_w  = pes[j, :L]
                     alp_w = alps[j, :L]
-                    local = self._combine_signals(tau_w, pe_w)
+                    all_tau_vals.append(tau_w)
+                    local = self._combine_signals(tau_w, pe_w, tau_ref=tau_ref)
                     score_max[s:end] = np.maximum(score_max[s:end], local)
                     alpha_sum[s:end] += alp_w
                     alpha_cnt[s:end] += 1
                     tau_sum[s:end]   += tau_w
                     pe_sum[s:end]    += pe_w
 
-        raw = score_max.copy()
-        raw[raw == -1e9] = 0.0  # guard against uncovered positions
+        score_max[score_max == -1e9] = 0.0  # guard against uncovered positions
 
+        # Global tau mean across all windows for Fix B calibration
+        tau_global_mean = float(np.concatenate(all_tau_vals).mean()) if all_tau_vals else 0.0
+
+        cnt = np.maximum(alpha_cnt, 1)
+        last_alpha = alpha_sum / cnt
+        last_tau   = tau_sum   / cnt
+        last_pe    = pe_sum    / cnt
+
+        return score_max, tau_global_mean, last_alpha, last_tau, last_pe
+
+    def _raw_score_windowed(self, arr_normed: np.ndarray) -> np.ndarray:
+        """Windowed scoring with per-window RevIN normalisation.
+
+        Runs at two scales (Fix A) and uses a global tau reference (Fix B):
+        - Small-window pass at ``cfg.window_size``
+        - Large-window pass at ``4 × cfg.window_size`` (if long enough)
+        - Per-timestep score = max(small, large)
+        - Smoothing applied once after fusion
+        """
+        T = len(arr_normed)
+        small_ws = self.cfg.window_size
+        tau_ref = self._train_tau_mean   # None during first (calibration) call
+
+        # Fix A: large-window pass — always use within-window tau mean (tau_ref=None).
+        # Using the small-window tau_ref here would cause systematic score inflation
+        # because large-window tau values live on a different scale.
+        large_ws = min(small_ws * 4, T // 3)
+        if large_ws >= small_ws * 2:
+            score_large, _, _, _, _ = self._run_windowed_pass(arr_normed, large_ws, tau_ref=None)
+        else:
+            score_large = None
+
+        # Small-window pass (also sets the per-timestep detail signals)
+        score_small, tau_global_mean, last_alpha, last_tau, last_pe = \
+            self._run_windowed_pass(arr_normed, small_ws, tau_ref)
+
+        # Fix B: cache training tau mean after the first (calibration) call
+        if self._train_tau_mean is None:
+            self._train_tau_mean = tau_global_mean
+
+        # Fuse scales
+        raw = np.maximum(score_small, score_large) if score_large is not None else score_small
+
+        # Smoothing — applied once after fusion
         if self.cfg.score_smoothing > 1:
             kernel = np.ones(self.cfg.score_smoothing) / self.cfg.score_smoothing
             raw = np.convolve(raw, kernel, mode="same")
 
-        # Store aggregated signals for score_detail
-        cnt = np.maximum(alpha_cnt, 1)
-        self._last_alpha   = alpha_sum / cnt
-        self._last_tau     = tau_sum   / cnt
-        self._last_pe      = pe_sum    / cnt
+        # Store fine-grained signals for score_detail
+        self._last_alpha = last_alpha
+        self._last_tau   = last_tau
+        self._last_pe    = last_pe
 
         return raw
 
@@ -622,6 +692,7 @@ class TemporalAnomalyDetector:
             "train_std": self._train_std,
             "score_mean": self._score_mean,
             "score_std": self._score_std,
+            "train_tau_mean": self._train_tau_mean,
             "fitted": self._fitted,
         }
         torch.save(state, path)
@@ -636,11 +707,12 @@ class TemporalAnomalyDetector:
             device=device,
         )
         det.model.load_state_dict(state["model_state"])
-        det._train_mean = state["train_mean"]
-        det._train_std  = state["train_std"]
-        det._score_mean = state["score_mean"]
-        det._score_std  = state["score_std"]
-        det._fitted     = state["fitted"]
+        det._train_mean      = state["train_mean"]
+        det._train_std       = state["train_std"]
+        det._score_mean      = state["score_mean"]
+        det._score_std       = state["score_std"]
+        det._train_tau_mean  = state.get("train_tau_mean", None)
+        det._fitted          = state["fitted"]
         return det
 
     # ------------------------------------------------------------------
