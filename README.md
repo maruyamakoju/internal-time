@@ -24,15 +24,16 @@ Evaluated on all 52 labeled files from the [Numenta Anomaly Benchmark](https://g
 
 | Category | Files | pa-F1 (mean) | pa-Precision | pa-Recall |
 |---|---|---|---|---|
-| artificialWithAnomaly | 6 | **0.936** | 0.886 | 1.000 |
-| realTweets | 10 | **0.926** | 0.887 | 0.972 |
-| realTraffic | 7 | **0.893** | 0.849 | 0.964 |
-| realKnownCause | 7 | **0.846** | 0.891 | 0.857 |
-| realAWSCloudwatch | 16 | 0.689 | 0.678 | 0.781 |
-| realAdExchange | 6 | 0.375 | 0.446 | 0.417 |
-| **Overall** | **52** | **0.775** | **0.767** | **0.836** |
+| artificialWithAnomaly | 6 | **0.947** | 0.899 | 1.000 |
+| realTweets | 10 | **0.887** | 0.875 | 0.924 |
+| realKnownCause | 7 | **0.844** | 0.780 | 0.929 |
+| realAWSCloudwatch | 16 | **0.836** | 0.797 | 0.917 |
+| realTraffic | 7 | 0.722 | 0.708 | 0.845 |
+| realAdExchange | 6 | 0.574 | 0.544 | 0.667 |
+| **Overall** | **52** | **0.814** | **0.780** | **0.891** |
 
-Highlights: nyc_taxi 0.932, Twitter volume 0.926 avg, traffic 0.893 avg.
+v1.1 improvements: RevIN (per-window instance normalization) + IQR-based robust calibration.
+AWS +14.7%, AdExchange +19.9%, artificial +1.1%. Overall +3.9% vs v1.0 (0.775).
 
 ## How It Works
 

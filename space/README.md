@@ -4,7 +4,7 @@ emoji: 🕐
 colorFrom: blue
 colorTo: purple
 sdk: gradio
-sdk_version: "5.0.0"
+sdk_version: "5.9.1"
 app_file: app.py
 pinned: false
 ---
@@ -17,17 +17,17 @@ not just static outliers.
 
 ## Results
 
-**pa-F1 0.775** overall on the NAB benchmark (52 real-world time series files):
+**pa-F1 0.814** overall on the NAB benchmark (52 real-world time series files):
 
 | Category | Files | pa-F1 |
 |---|---|---|
-| artificialWithAnomaly | 6 | **0.936** |
-| realTweets | 10 | **0.926** |
-| realTraffic | 7 | **0.893** |
-| realKnownCause | 7 | **0.846** |
-| realAWSCloudwatch | 16 | 0.689 |
-| realAdExchange | 6 | 0.375 |
-| **Overall** | **52** | **0.775** |
+| artificialWithAnomaly | 6 | **0.947** |
+| realTweets | 10 | **0.887** |
+| realKnownCause | 7 | **0.844** |
+| realAWSCloudwatch | 16 | **0.836** |
+| realTraffic | 7 | 0.722 |
+| realAdExchange | 6 | 0.574 |
+| **Overall** | **52** | **0.814** |
 
 ## How It Works
 
